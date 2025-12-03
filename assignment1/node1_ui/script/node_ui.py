@@ -81,9 +81,14 @@ def get_turtle():
 #insert the velocity
 def get_twist():
     while True:
+        v_max = 20.0
         try:
-            linear_velocity = input("Insert the linear velocity (x-axis):\n") 
+            linear_velocity = input("Insert the linear velocity (x-axis), :\n") 
             turtle_v = float(linear_velocity.strip())
+            #check on velocity
+            if (turtle_v > 20):
+                print(f"Turtle too fast! Default velocity ({v_max})")
+                turtle_v = float(v_max)
 
             angular_velocity = input("Insert the angular velocity (z-axis):\n") 
             turtle_w = float(angular_velocity.strip())

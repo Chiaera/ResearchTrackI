@@ -17,3 +17,8 @@ PER ADESSO - UI
     - colcon build
     - source install/setup.bash
     - ros2 run turtlesim turtlesim_node | ros2 run node1_ui turtle_spawn | ros2 run node1_ui node_ui
+
+PER ADESSO - DISTANCE
+    - colcon build
+    - source install/setup.bash
+    - ros2 run turtlesim turtlesim_node | ros2 run node1_ui turtle_spawn | ros2 run node2_distance node2_distance
