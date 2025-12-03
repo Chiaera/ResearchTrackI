@@ -1,5 +1,8 @@
 #!/bin/bash
 
+#close child processes
+trap "echo 'Stopping launch...'; pkill -P $$; exit" SIGINT
+
 #in directory assignemnt1
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -25,9 +28,9 @@ sleep 2
 
 #terminal choise (UI)
 if command -v gnome-terminal >/dev/null 2>&1; then
-  TERM_CMD="gnome-terminal --"
+  TERM_CMD='gnome-terminal --'
 elif command -v xterm >/dev/null 2>&1; then
-  TERM_CMD="xterm -e"
+  TERM_CMD='xterm -e'
 else
   echo "new terminal:"
   echo "  source \"$WS_ROOT/install/setup.bash\""
@@ -37,3 +40,5 @@ fi
 
 echo "Opening UI node in a new terminal"
 $TERM_CMD bash -c "source \"$WS_ROOT/install/setup.bash\"; ros2 run node1_ui node_ui; exec bash"
+
+wait
