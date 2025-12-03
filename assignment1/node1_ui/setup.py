@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'node1_ui'
+package_name = 'node1_ui'  
 
 setup(
     name=package_name,
@@ -24,7 +24,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'node_ui = node1_ui.node_ui:main',
+            'node_ui = script.node_ui:main',
+            'turtle_spawn = script.turtle_spawn:main',
         ],
     },
 )

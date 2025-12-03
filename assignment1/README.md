@@ -11,3 +11,9 @@ ASSIGNMENT 1
           publish on a topic (msg: std_msgs/Float32)
           stop turtles if they are 'too close' (threshold)
           stop turtles if they are too close to the boundaries
+
+
+PER ADESSO - UI
+    - colcon build
+    - source install/setup.bash
+    - ros2 run turtlesim turtlesim_node | ros2 run node1_ui turtle_spawn | ros2 run node1_ui node_ui
