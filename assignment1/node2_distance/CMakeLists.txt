@@ -24,12 +24,18 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-add_executable(node2_distance src/node2_distance.cpp)
-ament_target_dependencies(node2_distance rclcpp std_msgs turtlesim geometry_msgs)
+add_executable(node_distance src/node_distance.cpp)
+ament_target_dependencies(node_distance rclcpp std_msgs turtlesim geometry_msgs)
 
 install(TARGETS
-  node2_distance
+  node_distance
   DESTINATION lib/${PROJECT_NAME}
+)
+
+#launch file
+install(
+  DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}/
 )
 
 ament_package()

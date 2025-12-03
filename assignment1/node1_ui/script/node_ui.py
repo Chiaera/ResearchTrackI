@@ -63,19 +63,19 @@ class UINode(Node):
 def get_turtle():
     while True:
         try:
-            turtle_input = input("Press\n   '1' to select Turtle1\n   '2' to select Turtle2\n")
+            turtle_input = input("PRESS '1' to select Turtle1 or '2' to select Turtle2:\n")
             turtle_id = int(turtle_input.strip())
 
             if turtle_id == 1:
-                print("You selected Turtle1!")
+                print("You selected Turtle1!\n")
                 return 1
             elif turtle_id == 2:
-                print("You selected Turtle2!")
+                print("You selected Turtle2!1n")
                 return 2
             else:
-                print("Invalid output: select 1 or 2")
+                print("Invalid output: select 1 or 2\n")
         except ValueError:
-            print("Invalid turtle input")
+            print("Invalid turtle input: Select a turtle")
 
 
 #insert the velocity
@@ -83,19 +83,19 @@ def get_twist():
     while True:
         v_max = 20.0
         try:
-            linear_velocity = input("Insert the linear velocity (x-axis), :\n") 
+            linear_velocity = input("INSERT the linear velocity (x-axis):\n") 
             turtle_v = float(linear_velocity.strip())
             #check on velocity
             if (turtle_v > 20):
-                print(f"Turtle too fast! Default velocity ({v_max})")
+                print(f"Turtle too fast! Default velocity ({v_max})\n")
                 turtle_v = float(v_max)
 
-            angular_velocity = input("Insert the angular velocity (z-axis):\n") 
+            angular_velocity = input("INSERT the angular velocity (z-axis):\n") 
             turtle_w = float(angular_velocity.strip())
 
             return turtle_v, turtle_w
         except ValueError:
-            print("Invalid velocity input")
+            print("Invalid velocity input: Insert again both the velocity")
 
 
 def main(args=None):
@@ -105,8 +105,10 @@ def main(args=None):
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
-    node.destroy_node()
-    rclpy.shutdown()
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":

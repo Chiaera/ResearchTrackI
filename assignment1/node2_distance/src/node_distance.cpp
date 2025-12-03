@@ -14,7 +14,7 @@
 class  DistanceNode: public rclcpp::Node
 {
 public:
-    DistanceNode() : Node("node2_distance")
+    DistanceNode() : Node("node_distance")
     {
         RCLCPP_INFO(this->get_logger(), "Distance node started");
         //publisher

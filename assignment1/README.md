@@ -13,12 +13,47 @@ ASSIGNMENT 1
           stop turtles if they are too close to the boundaries
 
 
-PER ADESSO - UI
-    - colcon build
-    - source install/setup.bash
-    - ros2 run turtlesim turtlesim_node | ros2 run node1_ui turtle_spawn | ros2 run node1_ui node_ui
+SET UP THE WORKSPACE
+    - create a workspace
+        mkdir -p ros2_ws/src
+        cd ros2_ws/src
+    
+    - copy repository ResearchTrackI in src
+    - the final project structure should be
+        ros2_ws
+        └── src
+            └── ResearchTrackI
+                └── assignment1
+                    ├── launch_assignment1.sh
+                    ├── node1_ui
+                    │   ├── package.xml
+                    │   ├── resource
+                    │   │   └── node1_ui
+                    │   ├── script
+                    │   │   ├── __init__.py
+                    │   │   ├── node_ui.py
+                    │   │   └── turtle_spawn.py
+                    │   ├── setup.cfg
+                    │   ├── setup.py
+                    │   └── test
+                    │       ├── test_copyright.py
+                    │       ├── test_flake8.py
+                    │       └── test_pep257.py
+                    ├── node2_distance
+                    │   ├── CMakeLists.txt
+                    │   ├── include
+                    │   │   └── node2_distance
+                    │   ├── launch
+                    │   │   └── assignment_launch.py
+                    │   ├── package.xml
+                    │   └── src
+                    │       └── node_distance.cpp
+                    └── README.md       
 
-PER ADESSO - DISTANCE
-    - colcon build
-    - source install/setup.bash
-    - ros2 run turtlesim turtlesim_node | ros2 run node1_ui turtle_spawn | ros2 run node2_distance node2_distance
+EXECUTE ASSIGNMENT
+    - in the workspace directory
+        cd ros2_ws
+    - launch script
+        ./src/ResearchTrackI/assignment1/launch_assignment1.sh
+
+
