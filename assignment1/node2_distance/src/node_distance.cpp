@@ -133,10 +133,14 @@ private:
 
     void avoid_t1(){
         geometry_msgs::msg::Twist cmd;
-        cmd.linear.x  = -1.0;
-        if (pose2_x_ > pose1_x_) {
+        if (pose1_y_ > pose2_y_) { //t1 above
+            cmd.linear.x = 1.0; 
+        } else { //t1 over
+            cmd.linear.x = -1.0;  
+        }
+        if (pose2_x_ > pose1_x_) { //t1 to right
             cmd.angular.z = -0.5;
-        } else {
+        } else { //t2 to left
             cmd.angular.z = 0.5;
         }
 
@@ -145,7 +149,11 @@ private:
     }
     void avoid_t2(){
         geometry_msgs::msg::Twist cmd;
-        cmd.linear.x  = -1.0;
+            if (pose1_y_ > pose2_y_) {
+            cmd.linear.x = -1.0;  
+        } else {
+            cmd.linear.x = 1.0;
+        }
         if (pose2_x_ > pose1_x_) {
             cmd.angular.z = 0.5;
         } else {

@@ -55,6 +55,6 @@ EXECUTE ASSIGNMENT
         cd ros2_ws
     - launch script
         ./src/ResearchTrackI/assignment1/launch_assignment1.sh
-    - to close all the processes ctr+C in the VS terminal
+    - to close all the processes ctr+C in the VS terminal and close the indipendent one
 
 
