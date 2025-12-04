@@ -9,6 +9,8 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include "std_msgs/msg/float32.hpp"
 #include <cmath>
+#include "std_msgs/msg/int32.hpp"
+
 
 class DistanceNode : public rclcpp::Node
 {
@@ -54,17 +56,27 @@ public:
             10,
             std::bind(&DistanceNode::turtle2CmdCallback, this, std::placeholders::_1)
         );
+        //active turtle
+        sub_active_ = this->create_subscription<std_msgs::msg::Int32>(
+            "/active_turtle",
+            10,
+            std::bind(&DistanceNode::activeTurtleCallback, this, std::placeholders::_1)
+        );
     }
 
 private:
     // levels
     enum class PreventCollision { GREEN, ORANGE, RED };
 
-    const float collision_red_    = 0.2f;
-    const float collision_orange_ = 0.4f;
+    const float collision_red_    = 1.0f;
+    const float collision_orange_ = 2.0f;
 
     PreventCollision last_border1_{PreventCollision::GREEN};
     PreventCollision last_border2_{PreventCollision::GREEN};
+
+    int active_turtle_{0};  
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr sub_active_;
+
 
     //collision between turtles
     PreventCollision zone_color(float d)
@@ -109,49 +121,28 @@ private:
     void stop_t1()
     {
         geometry_msgs::msg::Twist stop_msg;
-        stop_msg.linear.x  = 0.0;
-        stop_msg.linear.y  = 0.0;
-        stop_msg.linear.z  = 0.0;
-        stop_msg.angular.x = 0.0;
-        stop_msg.angular.y = 0.0;
-        stop_msg.angular.z = 0.0;
-
         pub_t1_cmd_->publish(stop_msg);
-        RCLCPP_WARN(this->get_logger(), "Turtle1: stop");
+        RCLCPP_WARN(this->get_logger(), "Turtle1: STOP");
     }
-
     void stop_t2()
     {
         geometry_msgs::msg::Twist stop_msg;
-        stop_msg.linear.x  = 0.0;
-        stop_msg.linear.y  = 0.0;
-        stop_msg.linear.z  = 0.0;
-        stop_msg.angular.x = 0.0;
-        stop_msg.angular.y = 0.0;
-        stop_msg.angular.z = 0.0;
-
         pub_t2_cmd_->publish(stop_msg);
-        RCLCPP_WARN(this->get_logger(), "Turtle2: stop");
-    }
-
-    bool is_moving(const geometry_msgs::msg::Twist& cmd, double eps = 1e-3) {
-        double lin = std::abs(cmd.linear.x) + std::abs(cmd.linear.y) + std::abs(cmd.linear.z);
-        double ang = std::abs(cmd.angular.x) + std::abs(cmd.angular.y) + std::abs(cmd.angular.z);
-        return (lin + ang) > eps;
+        RCLCPP_WARN(this->get_logger(), "Turtle2: STOP");
     }
 
     void avoid_t1(){
         geometry_msgs::msg::Twist cmd;
-        cmd.linear.x  = 1.0;
-        cmd.angular.z = M_PI/2;
+        cmd.linear.x  = -1.0;
+        cmd.angular.z = 0.0;
 
         pub_t1_cmd_->publish(cmd);
         RCLCPP_INFO(this->get_logger(), "Turtle1: avoidance manoeuvre");
     }
     void avoid_t2(){
         geometry_msgs::msg::Twist cmd;
-        cmd.linear.x  = 1.0;
-        cmd.angular.z = M_PI/2;
+        cmd.linear.x  = -1.0;
+        cmd.angular.z = 0.0;
 
         pub_t2_cmd_->publish(cmd);
         RCLCPP_INFO(this->get_logger(), "Turtle2: avoidance manoeuvre");
@@ -210,8 +201,6 @@ private:
 
         //turtles distance
         PreventCollision mode = zone_color(d);
-        bool t1_moving = new_cmd_t1_ && is_moving(last_cmd_t1_);
-        bool t2_moving = new_cmd_t2_ && is_moving(last_cmd_t2_);
 
         switch (mode) {
         case PreventCollision::GREEN:
@@ -220,11 +209,10 @@ private:
 
         case PreventCollision::ORANGE:
             RCLCPP_DEBUG(this->get_logger(), "The turtles are close: avoidance");
-
-            if (t1_moving && !t2_moving) {
-                avoid_t1();
-            } else if (!t1_moving && t2_moving) {
+            if (active_turtle_ == 1) {
                 avoid_t2();
+            } else if (active_turtle_ == 2) {
+                avoid_t1();
             } else { //fallback
                 avoid_t2();
             }
@@ -232,23 +220,24 @@ private:
 
         case PreventCollision::RED:
             RCLCPP_DEBUG(this->get_logger(), "The turtles are too close: stop");
-            if (t1_moving && !t2_moving) {
-                retreat_t1();
+            if (active_turtle_ == 1) {
                 stop_t1();
-            } else if (!t1_moving && t2_moving) {
+            } else if (active_turtle_ == 2) {
                 stop_t2();
-            } 
-            break;
+            } else {
+                stop_t1();
+                stop_t2();
+            }
         }
 
         //collision with borders
         PreventCollision border1 = border_color(pose1_x_, pose1_y_);
         PreventCollision border2 = border_color(pose2_x_, pose2_y_);
 
-        if (border1 == PreventCollision::RED || border1 == PreventCollision::ORANGE) {
+        if(active_turtle_==1 &&(border1 == PreventCollision::RED || border1 == PreventCollision::ORANGE)) {
             retreat_and_turn_t1();
         }
-        if (border2 == PreventCollision::RED || border2 == PreventCollision::ORANGE) {
+        if(active_turtle_==2 &&-(border2 == PreventCollision::RED || border2 == PreventCollision::ORANGE)) {
             retreat_and_turn_t2();
         }
 
@@ -276,6 +265,12 @@ private:
         RCLCPP_DEBUG(this->get_logger(), "Turtle2 pose: x=%.2f, y=%.2f", pose2_x_, pose2_y_);
 
         calculate_distance();
+    }
+
+    void activeTurtleCallback(const std_msgs::msg::Int32::SharedPtr msg)
+    {
+        active_turtle_ = msg->data;
+        RCLCPP_INFO(this->get_logger(), "Active turtle set to: %d", active_turtle_);
     }
 
     void turtle1CmdCallback(const geometry_msgs::msg::Twist::SharedPtr msg){

@@ -7,6 +7,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 import time
+from std_msgs.msg import Int32
 
 
 class UINode(Node):
@@ -17,6 +18,7 @@ class UINode(Node):
         #define publisher
         self.pub_t1 = self.create_publisher(Twist, "/turtle1/cmd_vel", 10)
         self.pub_t2 = self.create_publisher(Twist, "/turtle2/cmd_vel", 10)
+        self.pub_active = self.create_publisher(Int32, "/active_turtle", 10)
 
         #define duration of command
         self.timer = self.create_timer(0.5, self.command_loop)
@@ -30,11 +32,12 @@ class UINode(Node):
             turtle_id = get_turtle()
             turtle_v, turtle_w = get_twist()
 
-            self.get_logger().info(
-                f"Turtle {turtle_id} selected with "
-                f"linear velocity {turtle_v}, "
-                f"and angular velocity {turtle_w}"
-            )
+            #publish id of the moved turtles
+            active_msg = Int32()
+            active_msg.data = turtle_id
+            self.pub_active.publish(active_msg)
+
+            self.get_logger().info(f"Turtle {turtle_id} selected with "f"linear velocity {turtle_v}, "f"and angular velocity {turtle_w}")
 
             #select publisher
             if turtle_id == 1:
