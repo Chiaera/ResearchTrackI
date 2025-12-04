@@ -49,6 +49,7 @@ class UINode(Node):
             msg = Twist()
             msg.linear.x = turtle_v
             msg.angular.z = turtle_w
+
             Dt = 1.0
             start = time.time()
             
@@ -88,7 +89,7 @@ def get_twist():
         try:
             linear_velocity = input("INSERT the linear velocity (x-axis):\n") 
             turtle_v = float(linear_velocity.strip())
-            #check on velocity
+            #check on velocity: limit the maximum allowed velocity
             if (turtle_v > 20):
                 print(f"Turtle too fast! Default velocity ({v_max})\n")
                 turtle_v = float(v_max)
