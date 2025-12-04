@@ -81,7 +81,7 @@ def get_turtle():
 #insert the velocity
 def get_twist():
     while True:
-        v_max = 20.0
+        v_max = 10.0
         try:
             linear_velocity = input("INSERT the linear velocity (x-axis):\n") 
             turtle_v = float(linear_velocity.strip())

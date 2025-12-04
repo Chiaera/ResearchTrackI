@@ -63,6 +63,9 @@ private:
     const float collision_red_    = 0.2f;
     const float collision_orange_ = 0.4f;
 
+    PreventCollision last_border1_{PreventCollision::GREEN};
+    PreventCollision last_border2_{PreventCollision::GREEN};
+
     //collision between turtles
     PreventCollision zone_color(float d)
     {
@@ -140,35 +143,51 @@ private:
     void avoid_t1(){
         geometry_msgs::msg::Twist cmd;
         cmd.linear.x  = 1.0;
-        cmd.angular.z = 1.0;
+        cmd.angular.z = M_PI/2;
 
         pub_t1_cmd_->publish(cmd);
         RCLCPP_INFO(this->get_logger(), "Turtle1: avoidance manoeuvre");
     }
-
     void avoid_t2(){
         geometry_msgs::msg::Twist cmd;
-
         cmd.linear.x  = 1.0;
-        cmd.angular.z = 1.0;
+        cmd.angular.z = M_PI/2;
 
         pub_t2_cmd_->publish(cmd);
         RCLCPP_INFO(this->get_logger(), "Turtle2: avoidance manoeuvre");
     }
 
-    void turn_left_t1() {
+    void retreat_t1() {
         geometry_msgs::msg::Twist cmd;
-        cmd.linear.x = 0.0;
-        cmd.angular.z = M_PI/2;  
+        cmd.linear.x = -1.0;     
+        cmd.angular.z = 0.0;
         pub_t1_cmd_->publish(cmd);
+        RCLCPP_WARN(this->get_logger(), "Turtle1: retreat");
+    }
+    void retreat_t2() {
+        geometry_msgs::msg::Twist cmd;
+        cmd.linear.x = -1.0;
+        cmd.angular.z = 0.0;
+        pub_t2_cmd_->publish(cmd);
+        RCLCPP_WARN(this->get_logger(), "Turtle2: retreat");
     }
 
-    void turn_left_t2() {
+    void retreat_and_turn_t1() {
         geometry_msgs::msg::Twist cmd;
-        cmd.linear.x = 0.0;
-        cmd.angular.z = M_PI/2;
-        pub_t2_cmd_->publish(cmd);
+        cmd.linear.x  = -1.0;      
+        cmd.angular.z = M_PI/4;   
+        pub_t1_cmd_->publish(cmd);
+        RCLCPP_WARN(this->get_logger(), "Turtle1: retreat + 90deg turn");
     }
+
+    void retreat_and_turn_t2() {
+        geometry_msgs::msg::Twist cmd;
+        cmd.linear.x  = -1.0;      
+        cmd.angular.z = M_PI/4;    
+        pub_t2_cmd_->publish(cmd);
+        RCLCPP_WARN(this->get_logger(), "Turtle2: retreat + 90deg turn");
+    }
+
 
 
     //distance
@@ -214,6 +233,7 @@ private:
         case PreventCollision::RED:
             RCLCPP_DEBUG(this->get_logger(), "The turtles are too close: stop");
             if (t1_moving && !t2_moving) {
+                retreat_t1();
                 stop_t1();
             } else if (!t1_moving && t2_moving) {
                 stop_t2();
@@ -225,27 +245,16 @@ private:
         PreventCollision border1 = border_color(pose1_x_, pose1_y_);
         PreventCollision border2 = border_color(pose2_x_, pose2_y_);
 
-        if (border1 == PreventCollision::RED) {
-            RCLCPP_DEBUG(this->get_logger(), "Turtle1 too close to border: stop");
-            turn_left_t1();
-            stop_t1();
-        } else if (border1 == PreventCollision::ORANGE) {
-            RCLCPP_DEBUG(this->get_logger(), "Turtle1 near border: avoidance");
-            if (new_cmd_t1_ && is_moving(last_cmd_t1_)) {
-                avoid_t1();
-                stop_t2();
-            }
+        if (border1 == PreventCollision::RED || border1 == PreventCollision::ORANGE) {
+            retreat_and_turn_t1();
+        }
+        if (border2 == PreventCollision::RED || border2 == PreventCollision::ORANGE) {
+            retreat_and_turn_t2();
         }
 
-        if (border2 == PreventCollision::RED) {
-            RCLCPP_DEBUG(this->get_logger(), "Turtle2 too close to border: stop");
-            turn_left_t2();
-        } else if (border2 == PreventCollision::ORANGE) {
-            RCLCPP_DEBUG(this->get_logger(), "Turtle2 near border: avoidance");
-            if (new_cmd_t2_ && is_moving(last_cmd_t2_)) {
-                avoid_t2();
-            }
-        }
+        //update last pose
+        last_border1_ = border1;
+        last_border2_ = border2;
     }
 
     //callbacks
@@ -254,8 +263,7 @@ private:
         pose1_y_   = msg->y;
         new_pose1_ = true;
 
-        RCLCPP_DEBUG(this->get_logger(),
-                     "Turtle1 pose: x=%.2f, y=%.2f", pose1_x_, pose1_y_);
+        RCLCPP_DEBUG(this->get_logger(), "Turtle1 pose: x=%.2f, y=%.2f", pose1_x_, pose1_y_);
 
         calculate_distance();
     }
@@ -265,8 +273,7 @@ private:
         pose2_y_   = msg->y;
         new_pose2_ = true;
 
-        RCLCPP_DEBUG(this->get_logger(),
-                     "Turtle2 pose: x=%.2f, y=%.2f", pose2_x_, pose2_y_);
+        RCLCPP_DEBUG(this->get_logger(), "Turtle2 pose: x=%.2f, y=%.2f", pose2_x_, pose2_y_);
 
         calculate_distance();
     }
@@ -292,7 +299,6 @@ private:
     rclcpp::Subscription<turtlesim::msg::Pose>::SharedPtr sub_t2_;
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_t1_cmd_;
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_t2_cmd_;
-
 
     //save state (poses)
     float pose1_x_{0.0f};
