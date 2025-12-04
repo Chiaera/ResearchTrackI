@@ -134,7 +134,11 @@ private:
     void avoid_t1(){
         geometry_msgs::msg::Twist cmd;
         cmd.linear.x  = -1.0;
-        cmd.angular.z = 0.0;
+        if (pose2_x_ > pose1_x_) {
+            cmd.angular.z = -0.5;
+        } else {
+            cmd.angular.z = 0.5;
+        }
 
         pub_t1_cmd_->publish(cmd);
         RCLCPP_INFO(this->get_logger(), "Turtle1: avoidance manoeuvre");
@@ -142,7 +146,11 @@ private:
     void avoid_t2(){
         geometry_msgs::msg::Twist cmd;
         cmd.linear.x  = -1.0;
-        cmd.angular.z = 0.0;
+        if (pose2_x_ > pose1_x_) {
+            cmd.angular.z = 0.5;
+        } else {
+            cmd.angular.z = -0.5;
+        }
 
         pub_t2_cmd_->publish(cmd);
         RCLCPP_INFO(this->get_logger(), "Turtle2: avoidance manoeuvre");
