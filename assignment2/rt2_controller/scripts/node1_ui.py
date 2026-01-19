@@ -19,7 +19,7 @@ class UserInterface(Node):
             10
         )
 
-        self.get_logger().info("UI pronta. Inserisci linear_x e angular_z.")
+        self.get_logger().info("Insert linear velocity (linear_x) and angular velocity (angular_z):")
 
     def obstacle_callback(self, msg):
         self.get_logger().info(
@@ -37,10 +37,10 @@ class UserInterface(Node):
                 twist.angular.z = ang
 
                 self.pub_cmd.publish(twist)
-                print("Comando inviato.\n")
+                print("Command sent.\n")
 
             except ValueError:
-                print("Valore non valido, riprova.\n")
+                print("Invalid value, try again.\n")
 
 def main(args=None):
     rclpy.init(args=args)
