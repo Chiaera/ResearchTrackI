@@ -4,7 +4,7 @@ This project is a ROS 2 package composed of **two nodes** that control two turtl
 
 ## Nodes
 
-### 1. UI Node (`node1_ui`)
+### 1. UI Node (`node1_ui`) - Python
 
 This node provides a simple **text-based user interface**.
 
@@ -14,7 +14,7 @@ This node provides a simple **text-based user interface**.
 - Publishes velocity commands to the selected turtle for **1 second**
 - Publishes the **ID of the active turtle** on the `/active_turtle` topic
 
-### 2. Distance Node (`node2_distance`)
+### 2. Distance Node (`node2_distance`) - C++
 
 This node is responsible for:
 
