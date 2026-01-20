@@ -71,13 +71,13 @@ private:
     rclcpp::Service<rt2_interfaces::srv::SetThreshold>::SharedPtr srv_set_threshold_;
     rclcpp::Service<rt2_interfaces::srv::GetAverages>::SharedPtr srv_get_averages_;
 
-    //callback to user command
+    //callback for user command
     void cmdCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
     {
-        last_cmd_ = *msg;
+        last_cmd_ = *msg; //store the last command (wait for safety check)
     }
 
-    //callback to  laser
+    //callback for  laser
     void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
         //minimum distance
@@ -129,6 +129,7 @@ private:
         else
         {
             res->average = sum_min_dist_ / count_;
+            RCLCPP_INFO(get_logger(), "Robot approached medians of: %.2f", res->average);
         }
     }
 };

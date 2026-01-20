@@ -21,6 +21,7 @@ class UserInterface(Node):
 
         self.get_logger().info("Insert linear velocity (linear_x) and angular velocity (angular_z):")
 
+    #callback for obstacle info
     def obstacle_callback(self, msg):
         self.get_logger().info(
             f"[Obstacle] min={msg.min_distance:.2f} dir={msg.direction} thr={msg.threshold:.2f}"
