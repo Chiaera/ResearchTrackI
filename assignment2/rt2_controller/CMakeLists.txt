@@ -33,7 +33,7 @@ endif()
 
 # install Python scripts
 install(PROGRAMS 
-  scripts/node1_ui 
+  scripts/node1_ui.py 
   DESTINATION lib/${PROJECT_NAME} 
 )
 

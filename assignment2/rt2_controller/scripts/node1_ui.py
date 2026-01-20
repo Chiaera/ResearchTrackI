@@ -63,7 +63,7 @@ class UserInterface(Node):
             rclpy.spin_once(self, timeout_sec=0.1)
 
             try:
-                print("\nSET VOLOCITIES:")
+                print("\nSET VELOCITIES:")
                 lin = float(input("linear_x: "))
                 ang = float(input("angular_z: "))
 
