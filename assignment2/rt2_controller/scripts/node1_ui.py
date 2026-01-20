@@ -24,7 +24,7 @@ class UserInterface(Node):
     #callback for obstacle info
     def obstacle_callback(self, msg):
         self.get_logger().info(
-            f"[Obstacle] min={msg.min_distance:.2f} dir={msg.direction} thr={msg.threshold:.2f}"
+            f"[Obstacle] min_distance={msg.min_distance:.2f} check on direction={msg.direction} threshold={msg.threshold:.2f}"
         )
 
     def run(self):
@@ -42,6 +42,7 @@ class UserInterface(Node):
 
             except ValueError:
                 print("Invalid value, try again.\n")
+
 
 def main(args=None):
     rclpy.init(args=args)
