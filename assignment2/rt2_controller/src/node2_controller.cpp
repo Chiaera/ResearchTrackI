@@ -6,7 +6,7 @@
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 
-#include "rt2_interfaces/msg/obstacle_info.hpp"
+#include "rt2_interfaces/msg/motion.hpp"
 #include "rt2_interfaces/srv/set_threshold.hpp"
 #include "rt2_interfaces/srv/get_averages.hpp"
 
@@ -31,15 +31,15 @@ public:
         //publisher of the twist
         pub_cmd_ = create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
-        //publisher of obstacles info
-        pub_info_ = create_publisher<rt2_interfaces::msg::ObstacleInfo>(
-            "/obstacle_info", 10);
+        //publisher of motion info
+        pub_info_ = create_publisher<rt2_interfaces::msg::Motion>(
+            "/motion", 10);
 
         //setting threshold
         srv_set_threshold_ = create_service<rt2_interfaces::srv::SetThreshold>(
             "/set_threshold",
             std::bind(&Controller::setThreshold, this, _1, _2));
-
+        
         //get averages
         srv_get_averages_ = create_service<rt2_interfaces::srv::GetAverages>(
             "/get_averages",
@@ -57,6 +57,7 @@ private:
 
     //to compute distance
     double sum_min_dist_ = 0.0;
+    double last_min_dist_ = 0.0;
     int count_ = 0;
 
     //subscriber
@@ -65,7 +66,7 @@ private:
 
     //publisher
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pub_cmd_;
-    rclcpp::Publisher<rt2_interfaces::msg::ObstacleInfo>::SharedPtr pub_info_;
+    rclcpp::Publisher<rt2_interfaces::msg::Motion>::SharedPtr pub_info_;
 
     //services
     rclcpp::Service<rt2_interfaces::srv::SetThreshold>::SharedPtr srv_set_threshold_;
@@ -82,20 +83,23 @@ private:
     {
         //minimum distance
         double min_dist = *std::min_element(msg->ranges.begin(), msg->ranges.end());
+        last_min_dist_ = min_dist;
 
         //update distances for the average
         sum_min_dist_ += min_dist;
         count_++;
 
         //check on the direction
-        std::string direction = (min_dist < threshold_) ? "STOP" : "OK";
+        std::string movement = (min_dist < threshold_) ? "STOP" : "GO";
 
-        //print  ObstacleInfo
-        rt2_interfaces::msg::ObstacleInfo info;
-        info.min_distance = min_dist;
-        info.direction = direction;
+        //print message check for Motion
+        rt2_interfaces::msg::Motion info;
+        info.average_distance = sum_min_dist_ / count_;
+        info.minimum_distance = min_dist;
+        info.move = movement;   
         info.threshold = threshold_;
         pub_info_->publish(info);
+
 
         //set the safe zone
         geometry_msgs::msg::Twist safe_cmd = last_cmd_;
@@ -114,6 +118,7 @@ private:
     {
         threshold_ = req->threshold;
         res->success = true;
+        res->message = "Threshold updated successfully";
         RCLCPP_INFO(get_logger(), "New threshold: %.2f", threshold_);
     }
 
@@ -122,14 +127,16 @@ private:
         const std::shared_ptr<rt2_interfaces::srv::GetAverages::Request>,
         std::shared_ptr<rt2_interfaces::srv::GetAverages::Response> res)
     {
-        if (count_ == 0)
-        {
+        if (count_ == 0) {
             res->average = 0.0;
+            res->minimum = 0.0;
+            res->message = "No data available yet";
         }
-        else
-        {
+        else {
             res->average = sum_min_dist_ / count_;
-            RCLCPP_INFO(get_logger(), "Robot approached medians of: %.2f", res->average);
+            res->minimum = last_min_dist_;  
+            res->message = "Averages computed successfully";
+            RCLCPP_INFO(get_logger(), "Robot approached averages of: %.2f,  min: %.2f", res->average, res->minimum); 
         }
     }
 };

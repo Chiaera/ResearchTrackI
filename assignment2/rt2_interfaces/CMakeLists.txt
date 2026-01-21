@@ -12,7 +12,7 @@ find_package(rosidl_default_generators REQUIRED)
 
 # generate interfaces
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/ObstacleInfo.msg"
+  "msg/Motion.msg"
   "srv/SetThreshold.srv"
   "srv/GetAverages.srv"
 )

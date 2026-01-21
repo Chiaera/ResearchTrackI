@@ -1,0 +1,4 @@
+float32 average_distance
+float32 minimum_distance
+string move
+float32 threshold

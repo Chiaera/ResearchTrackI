@@ -1,4 +1,4 @@
-
 ---
-# Response
 float64 average
+float64 minimum
+string message

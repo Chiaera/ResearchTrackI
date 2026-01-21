@@ -2,7 +2,7 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from rt2_interfaces.msg import ObstacleInfo
+from rt2_interfaces.msg import Motion
 from rt2_interfaces.srv import SetThreshold, GetAverages
 
 class UserInterface(Node):
@@ -22,10 +22,10 @@ class UserInterface(Node):
         self.pub_cmd = self.create_publisher(Twist, '/cmd_vel_input', 10)
 
         # subscriber
-        self.sub_obs = self.create_subscription(
-            ObstacleInfo,
-            '/obstacle_info',
-            self.obstacle_callback,
+        self.sub_motion = self.create_subscription(
+            Motion,
+            '/motion',
+            self.motion_callback,
             10
         )
         
@@ -33,10 +33,15 @@ class UserInterface(Node):
 
 
     # CALLBACKS
-    # callback for obstacle info
-    def obstacle_callback(self, msg):
+    # callback for motion info
+    def motion_callback(self, msg):
         try:
-            self.get_logger().info(f"[Obstacle] min_distance={msg.min_distance:.2f} check on direction={msg.direction} threshold={msg.threshold:.2f}")
+            self.get_logger().info(
+                f"[Motion] Average={msg.average_distance:.2f}, "
+                f"min={msg.minimum_distance:.2f}, "
+                f"move={msg.move}, "
+                f"threshold={msg.threshold:.2f}"
+            )
         except Exception as e:
             self.get_logger().error(f"Error: {e}")
 
@@ -44,7 +49,7 @@ class UserInterface(Node):
     def threshold_callback(self, future):
         try:
             response = future.result()
-            self.get_logger().info(f"New threshold set to: {response.threshold}")
+            self.get_logger().info(response.message)
         except Exception as e:
             self.get_logger().error(f"Error: {e}")
     
@@ -52,7 +57,11 @@ class UserInterface(Node):
     def averages_callback(self, future):
         try:
             response = future.result()
-            self.get_logger().info(f"Average of minimum distances: {response.average:.2f}")
+            self.get_logger().info(
+                f"Averages: avg={response.average:.2f}, "
+                f"min={response.minimum:.2f}, "
+                f"msg={response.message}"
+            )
         except Exception as e:
             self.get_logger().error(f"Error: {e}")
 
