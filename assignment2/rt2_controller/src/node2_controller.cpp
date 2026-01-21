@@ -1,12 +1,14 @@
 #include <memory>
 #include <vector>
 #include <algorithm>
+#include <cmath>
+#include <limits>
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 
-#include "rt2_interfaces/msg/motion.hpp"
+#include "rt2_interfaces/msg/obstacle_info.hpp"
 #include "rt2_interfaces/srv/set_threshold.hpp"
 #include "rt2_interfaces/srv/get_averages.hpp"
 
@@ -31,9 +33,9 @@ public:
         //publisher of the twist
         pub_cmd_ = create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
-        //publisher of motion info
-        pub_info_ = create_publisher<rt2_interfaces::msg::Motion>(
-            "/motion", 10);
+        //publisher of obstacle info
+        pub_info_ = create_publisher<rt2_interfaces::msg::ObstacleInfo>(
+            "/obstacle_info", 10);
 
         //setting threshold
         srv_set_threshold_ = create_service<rt2_interfaces::srv::SetThreshold>(
@@ -66,7 +68,7 @@ private:
 
     //publisher
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pub_cmd_;
-    rclcpp::Publisher<rt2_interfaces::msg::Motion>::SharedPtr pub_info_;
+    rclcpp::Publisher<rt2_interfaces::msg::ObstacleInfo>::SharedPtr pub_info_;
 
     //services
     rclcpp::Service<rt2_interfaces::srv::SetThreshold>::SharedPtr srv_set_threshold_;
@@ -81,33 +83,83 @@ private:
     //callback for  laser
     void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
-        //minimum distance
-        double min_dist = *std::min_element(msg->ranges.begin(), msg->ranges.end());
-        last_min_dist_ = min_dist;
+        //lambda to update the minimum distance
+        auto update_min = [&](double &current_min, double candidate) {
+            if (std::isfinite(candidate) && candidate >= msg->range_min && candidate <= msg->range_max && candidate < current_min)
+            {
+                current_min = candidate;
+            }
+        };  
 
-        //update distances for the average
-        sum_min_dist_ += min_dist;
+        //initialize zone minimums
+        double min_global = std::numeric_limits<double>::infinity();
+        double min_left   = std::numeric_limits<double>::infinity();
+        double min_front  = std::numeric_limits<double>::infinity();
+        double min_right  = std::numeric_limits<double>::infinity();
+
+        //zone angles
+        const double right_min_ang = -M_PI / 2.0;   // -90°
+        const double right_max_ang = -M_PI / 6.0;   // -30°
+        const double front_min_ang = -M_PI / 6.0;   // -30°
+        const double front_max_ang =  M_PI / 6.0;   // +30°
+        const double left_min_ang  =  M_PI / 6.0;   // +30°
+        const double left_max_ang  =  M_PI / 2.0;   // +90°
+
+        for (size_t i = 0; i < msg->ranges.size(); ++i) {
+            const double r = msg->ranges[i];
+            const double ang = msg->angle_min + static_cast<double>(i) * msg->angle_increment;
+
+            //minimum
+            update_min(min_global, r);
+
+            //minimum for angle zone
+            if (ang >= right_min_ang && ang < right_max_ang) { //-90° to -30°
+                update_min(min_right, r);
+            } else if (ang >= front_min_ang && ang <= front_max_ang) { //-30° to +30°
+                update_min(min_front, r);
+            } else if (ang > left_min_ang && ang <= left_max_ang) { //+30° to +90°
+                update_min(min_left, r);
+            }
+        }
+
+        //check for non-finite minimums
+        if (!std::isfinite(min_global)) {
+            min_global = 0.0;
+        }
+
+        last_min_dist_ = min_global;
+        sum_min_dist_ += min_global;
         count_++;
 
-        //check on the direction
-        std::string movement = (min_dist < threshold_) ? "STOP" : "GO";
+        //determine the direction of the closest obstacle
+        std::string direction = "unknown";
+        double best = std::numeric_limits<double>::infinity();
+        if (std::isfinite(min_right) && min_right < best) { best = min_right; direction = "right"; }
+        if (std::isfinite(min_front) && min_front < best) { best = min_front; direction = "front"; }
+        if (std::isfinite(min_left)  && min_left  < best) { best = min_left;  direction = "left";  }
+        if (direction == "unknown") {
+            RCLCPP_WARN(get_logger(), "No valid obstacle distances detected in any sector.");
+        } else {
+            RCLCPP_INFO(get_logger(), "Closest obstacle in direction: %s (distance: %.2f)", direction.c_str(), best);
+        }
 
-        //print message check for Motion
-        rt2_interfaces::msg::Motion info;
-        info.average_distance = sum_min_dist_ / count_;
-        info.minimum_distance = min_dist;
-        info.move = movement;   
-        info.threshold = threshold_;
+        //print messages for obstacles
+        rt2_interfaces::msg::ObstacleInfo info;
+        info.min_distance = static_cast<float>(min_global);
+        info.direction = direction;
+        info.threshold = static_cast<float>(threshold_);
         pub_info_->publish(info);
-
 
         //set the safe zone
         geometry_msgs::msg::Twist safe_cmd = last_cmd_;
-        if (min_dist < threshold_)
-        {
+        bool too_close = (min_global < threshold_);
+        if (too_close) {
             safe_cmd.linear.x = 0.0;
+            RCLCPP_INFO(get_logger(), "STOP: robot too close to obstacle (%.2f < %.2f)", min_global, threshold_);
+        } else {
+            RCLCPP_INFO(get_logger(), "GO: command is safe (%.2f >= %.2f)", min_global, threshold_);
         }
-
+        
         pub_cmd_->publish(safe_cmd);
     }
 
