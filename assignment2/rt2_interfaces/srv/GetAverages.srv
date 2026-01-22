@@ -1,4 +1,4 @@
 ---
-float64 average
-float64 minimum
+float64 avg_linear
+float64 avg_angular
 string message

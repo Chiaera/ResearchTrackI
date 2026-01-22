@@ -2,7 +2,7 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from rt2_interfaces.msg import Motion
+from rt2_interfaces.msg import ObstacleInfo
 from rt2_interfaces.srv import SetThreshold, GetAverages
 
 class UserInterface(Node):
@@ -22,10 +22,10 @@ class UserInterface(Node):
         self.pub_cmd = self.create_publisher(Twist, '/cmd_vel_input', 10)
 
         # subscriber
-        self.sub_motion = self.create_subscription(
-            Motion,
-            '/motion',
-            self.motion_callback,
+        self.sub_obstacle_info = self.create_subscription(
+            ObstacleInfo,
+            '/obstacle_info',
+            self.obstacle_info_callback,
             10
         )
         
@@ -33,13 +33,12 @@ class UserInterface(Node):
 
 
     # CALLBACKS
-    # callback for motion info
-    def motion_callback(self, msg):
+    # callback for obstacle info
+    def obstacle_info_callback(self, msg):
         try:
             self.get_logger().info(
-                f"[Motion] Average={msg.average_distance:.2f}, "
-                f"min={msg.minimum_distance:.2f}, "
-                f"move={msg.move}, "
+                f"[ObstacleInfo] min distance={msg.min_distance:.2f}, "
+                f"direction={msg.direction}, "
                 f"threshold={msg.threshold:.2f}"
             )
         except Exception as e:
@@ -58,9 +57,9 @@ class UserInterface(Node):
         try:
             response = future.result()
             self.get_logger().info(
-                f"Averages: avg={response.average:.2f}, "
-                f"min={response.minimum:.2f}, "
-                f"msg={response.message}"
+                f"{response.message}: "
+                f"linear= {response.avg_linear:.2f}, "
+                f"angular= {response.avg_angular:.2f}, "
             )
         except Exception as e:
             self.get_logger().error(f"Error: {e}")
@@ -89,19 +88,21 @@ class UserInterface(Node):
                     print("1 - Set new threshold")
                     print("2 - Get averages")
                     print("3 - Continue")
-                    request = int(input("Choose an option: "))
+                    request = int(input("Choose an number option: "))
                     
                     if request == 1:
                         req = SetThreshold.Request()
-                        req.threshold = float(input("Insert new threshold value: "))
+                        req.threshold = float(input("\nInsert new threshold value: "))
                         future = self.client_threshold.call_async(req)
-                        future.add_done_callback(self.threshold_callback)
+                        rclpy.spin_until_future_complete(self, future)
+                        self.threshold_callback(future)
                         break
 
                     elif request == 2:
                         req = GetAverages.Request()
                         future = self.client_averages.call_async(req)
-                        future.add_done_callback(self.averages_callback)
+                        rclpy.spin_until_future_complete(self, future)
+                        self.averages_callback(future)
                         break
                     
                     elif request == 3:
@@ -111,7 +112,7 @@ class UserInterface(Node):
                         print("Invalid option, try again.\n")
                     
             except ValueError:
-                print("Invalid value, try again.\n")
+                print("Invalid value. Continue..\n")
 
 
 def main(args=None):

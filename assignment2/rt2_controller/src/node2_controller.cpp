@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <deque>
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
@@ -34,18 +35,13 @@ public:
         pub_cmd_ = create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
         //publisher of obstacle info
-        pub_info_ = create_publisher<rt2_interfaces::msg::ObstacleInfo>(
-            "/obstacle_info", 10);
+        pub_info_ = create_publisher<rt2_interfaces::msg::ObstacleInfo>("/obstacle_info", 10);
 
         //setting threshold
-        srv_set_threshold_ = create_service<rt2_interfaces::srv::SetThreshold>(
-            "/set_threshold",
-            std::bind(&Controller::setThreshold, this, _1, _2));
+        srv_set_threshold_ = create_service<rt2_interfaces::srv::SetThreshold>("/set_threshold", std::bind(&Controller::setThreshold, this, _1, _2));
         
         //get averages
-        srv_get_averages_ = create_service<rt2_interfaces::srv::GetAverages>(
-            "/get_averages",
-            std::bind(&Controller::getAverages, this, _1, _2));
+        srv_get_averages_ = create_service<rt2_interfaces::srv::GetAverages>("/get_averages", std::bind(&Controller::getAverages, this, _1, _2));
 
         RCLCPP_INFO(get_logger(), "Controller awakes");
     }
@@ -53,14 +49,10 @@ public:
 private:
     //save the last command
     geometry_msgs::msg::Twist last_cmd_;
+    std::deque<geometry_msgs::msg::Twist> last_inputs_;
 
     //threshold
     double threshold_;
-
-    //to compute distance
-    double sum_min_dist_ = 0.0;
-    double last_min_dist_ = 0.0;
-    int count_ = 0;
 
     //subscriber
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_cmd_;
@@ -78,6 +70,11 @@ private:
     void cmdCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
     {
         last_cmd_ = *msg; //store the last command (wait for safety check)
+
+        last_inputs_.push_back(*msg);
+        if (last_inputs_.size() > 5) {
+            last_inputs_.pop_front();
+        }
     }
 
     //callback for  laser
@@ -127,10 +124,6 @@ private:
             min_global = 0.0;
         }
 
-        last_min_dist_ = min_global;
-        sum_min_dist_ += min_global;
-        count_++;
-
         //determine the direction of the closest obstacle
         std::string direction = "unknown";
         double best = std::numeric_limits<double>::infinity();
@@ -153,11 +146,13 @@ private:
         //set the safe zone
         geometry_msgs::msg::Twist safe_cmd = last_cmd_;
         bool too_close = (min_global < threshold_);
-        if (too_close) {
+        if (too_close && safe_cmd.linear.x > 0.0) { //blocking forward motion
             safe_cmd.linear.x = 0.0;
-            RCLCPP_INFO(get_logger(), "STOP: robot too close to obstacle (%.2f < %.2f)", min_global, threshold_);
+            RCLCPP_INFO(get_logger(), "TOO CLOSE: blocking forward motion (%.2f < %.2f). Rotation allowed.", min_global, threshold_);
+        } else if (too_close) { 
+            RCLCPP_INFO(get_logger(), "TOO CLOSE: only angular motion allowed (%.2f < %.2f)", min_global, threshold_);
         } else {
-            RCLCPP_INFO(get_logger(), "GO: command is safe (%.2f >= %.2f)", min_global, threshold_);
+            RCLCPP_INFO(get_logger(), "SAFE: command allowed (%.2f >= %.2f)", min_global, threshold_);
         }
         
         pub_cmd_->publish(safe_cmd);
@@ -179,17 +174,27 @@ private:
         const std::shared_ptr<rt2_interfaces::srv::GetAverages::Request>,
         std::shared_ptr<rt2_interfaces::srv::GetAverages::Response> res)
     {
-        if (count_ == 0) {
-            res->average = 0.0;
-            res->minimum = 0.0;
-            res->message = "No data available yet";
+        if (last_inputs_.empty()) { //no inputs received yet
+            res->avg_linear = 0.0;
+            res->avg_angular = 0.0;
+            res->message = "No velocity input received yet";
+            return;
         }
-        else {
-            res->average = sum_min_dist_ / count_;
-            res->minimum = last_min_dist_;  
-            res->message = "Averages computed successfully";
-            RCLCPP_INFO(get_logger(), "Robot approached averages of: %.2f,  min: %.2f", res->average, res->minimum); 
+
+        double sum_linear = 0.0;
+        double sum_angular = 0.0;
+
+        for (const auto &cmd : last_inputs_) {
+            sum_linear += cmd.linear.x;
+            sum_angular += cmd.angular.z;
         }
+
+        res->avg_linear = sum_linear / last_inputs_.size();
+        res->avg_angular = sum_angular / last_inputs_.size();
+        res->message = "Averages computed successfully over " + std::to_string(last_inputs_.size()) + " input(s)";
+
+        RCLCPP_INFO(get_logger(), "Robot average velocities over last %zu input(s): lin=%.2f, ang=%.2f",
+            last_inputs_.size(), res->avg_linear, res->avg_angular);
     }
 };
 
