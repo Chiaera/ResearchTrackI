@@ -1,5 +1,4 @@
 #include <memory>
-#include <vector>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -133,7 +132,7 @@ private:
         if (direction == "unknown") {
             RCLCPP_WARN(get_logger(), "No valid obstacle distances detected in any sector.");
         } else {
-            RCLCPP_INFO(get_logger(), "Closest obstacle in direction: %s (distance: %.2f)", direction.c_str(), best);
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000, "Closest obstacle: %s (min=%.2f, thr=%.2f)", direction.c_str(), min_global, threshold_);
         }
 
         //print messages for obstacles
@@ -148,11 +147,11 @@ private:
         bool too_close = (min_global < threshold_);
         if (too_close && safe_cmd.linear.x > 0.0) { //blocking forward motion
             safe_cmd.linear.x = 0.0;
-            RCLCPP_INFO(get_logger(), "TOO CLOSE: blocking forward motion (%.2f < %.2f). Rotation allowed.", min_global, threshold_);
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "Too close: blocking forward (min=%.2f < thr=%.2f). Rotation allowed.", min_global, threshold_);
         } else if (too_close) { 
-            RCLCPP_INFO(get_logger(), "TOO CLOSE: only angular motion allowed (%.2f < %.2f)", min_global, threshold_);
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "TOO CLOSE: forward blocked, rotation/backward allowed (%.2f < %.2f)", min_global, threshold_);
         } else {
-            RCLCPP_INFO(get_logger(), "SAFE: command allowed (%.2f >= %.2f)", min_global, threshold_);
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000, "SAFE: command allowed (%.2f >= %.2f)", min_global, threshold_);
         }
         
         pub_cmd_->publish(safe_cmd);
