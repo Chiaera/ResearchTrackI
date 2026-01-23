@@ -8,6 +8,7 @@ from rt2_interfaces.srv import SetThreshold, GetAverages
 import sys
 import termios
 import tty
+import select
 
 
 HELP = r"""
@@ -16,10 +17,13 @@ s - Backward
 e - Rotate left
 r - Rotate right
 d - Stop
+
 t - Set new threshold
 y - Get averages of last 5 velocities
 u - Set linear speed
 i - Set angular speed
+
+h - help
 q - Quit
 """
 
@@ -29,7 +33,10 @@ def read_key():
     old = termios.tcgetattr(fd)
     try:
         tty.setraw(fd)
-        ch = sys.stdin.read(1)
+        if select.select([sys.stdin], [], [], 0)[0]:
+            ch = sys.stdin.read(1)
+        else:
+            ch = ''
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
     return ch
@@ -58,11 +65,11 @@ class UserInterface(Node):
             10
         )
         
-        self.lin_speed = 0.5
+        self.lin_speed = 3.0
         self.ang_speed = 1.0
 
         print(HELP)
-        print(f"Current speeds: linear= {self.lin_speed:.2f}, angular= {self.ang_speed:.2f}")
+        print(f"Current speeds: linear= {self.lin_speed:.2f} m/s, angular= {self.ang_speed:.2f} rad/s\n")
         print("Press a key ('h' to reprint the options).")
 
 
@@ -77,7 +84,7 @@ class UserInterface(Node):
                 f"threshold={msg.threshold:.2f}"
             )
         except Exception as e:
-            self.get_logger().error(f"Error: {e}")
+            self.get_logger().error(f"Error in obstacle_info_callback: {e}")
 
     #callback for threshold setting
     def threshold_callback(self, future):
@@ -85,7 +92,7 @@ class UserInterface(Node):
             response = future.result()
             self.get_logger().info(response.message)
         except Exception as e:
-            self.get_logger().error(f"Error: {e}")
+            self.get_logger().error(f"Error in threshold_callback: {e}")
     
     #callback for averages
     def averages_callback(self, future):
@@ -97,7 +104,7 @@ class UserInterface(Node):
                 f"angular= {response.avg_angular:.2f}, "
             )
         except Exception as e:
-            self.get_logger().error(f"Error: {e}")
+            self.get_logger().error(f"Error in averages_callback: {e}")
 
 
     def run(self):
@@ -107,78 +114,118 @@ class UserInterface(Node):
 
             key = read_key()
 
+            if not key:
+                continue
+
             #setting
-            if key == 'q': # quit
-                print("\nQuitting.")
+            if key == 'q':
+                print("Quit\n")
                 twist = Twist()
                 self.pub_cmd.publish(twist)
                 break
-            elif key == 'h': # help
+
+            #help
+            elif key == 'h':
                 print(HELP)
-                continue
-            elif key == 't': # set threshold
+                print(f"Current speeds: linear={self.lin_speed:.2f} m/s, angular={self.ang_speed:.2f} rad/s\n")
+
+            #set threshold
+            elif key == 't':
+                fd = sys.stdin.fileno() #restore normal terminal for input
+                old_settings = termios.tcgetattr(fd)
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                
                 try:
+                    val = float(input("Enter new threshold [m]: "))
                     req = SetThreshold.Request()
-                    req.threshold = float(input("\nInsert new threshold value: "))
+                    req.threshold = val
                     future = self.client_threshold.call_async(req)
-                    rclpy.spin_until_future_complete(self, future)
-                    self.threshold_callback(future)
+                    rclpy.spin_until_future_complete(self, future, timeout_sec=2.0)
+                    if future.done():
+                        self.threshold_callback(future)
+                    else:
+                        print("timeout\n")
                 except ValueError:
-                    print("Invalid threshold.")
-                continue
-            elif key == 'y': # get averages
+                    print("Invalid value\n")
+                except Exception as e:
+                    print(f"Error in threshold setting: {e}\n")
+
+            #get averages
+            elif key == 'y':
                 req = GetAverages.Request()
                 future = self.client_averages.call_async(req)
-                rclpy.spin_until_future_complete(self, future)
-                self.averages_callback(future)
-                continue
-            elif key == 'u': # set linear speed
-                try:
-                    self.lin_speed = float(input("\nSet linear speed: "))
-                    print(f"new linear speed= {self.lin_speed:.2f}")
-                except ValueError:
-                    print("Invalid value.")
-                continue
-            elif key == 'i': # set angular speed
-                try:
-                    self.ang_speed = float(input("\nSet angular speed: "))
-                    print(f"new angular speed= {self.ang_speed:.2f}")
-                except ValueError:
-                    print("Invalid value.")
-                continue
+                rclpy.spin_until_future_complete(self, future, timeout_sec=2.0)
+                if future.done():
+                    self.averages_callback(future)
+                else:
+                    print("timeout\n")
 
-            #motion
-            elif key == 'f': # forward
+            #set linear speed
+            elif key == 'u':
+                fd = sys.stdin.fileno()
+                old_settings = termios.tcgetattr(fd)
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                
+                try:
+                    val = float(input("Enter linear speed [m/s]: "))
+                    self.lin_speed = val
+                    print(f"New linear speed: {self.lin_speed:.2f} m/s\n")
+                except ValueError:
+                    print("Invalid value\n")
+
+            #set angular speed
+            elif key == 'i':
+                fd = sys.stdin.fileno()
+                old_settings = termios.tcgetattr(fd)
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                
+                try:
+                    val = float(input("Enter angular speed [rad/s]: "))
+                    self.ang_speed = val
+                    print(f"New angular speed: {self.ang_speed:.2f} rad/s\n")
+                except ValueError:
+                    print("Invalid value\n")
+
+            #forward
+            elif key == 'f':
                 twist = Twist()
                 twist.linear.x = self.lin_speed
                 twist.angular.z = 0.0
                 self.pub_cmd.publish(twist)
-                continue
-            elif key == 's':  # backward
+                print(f"Go forward: {self.lin_speed:.2f} m/s")
+
+            #backward
+            elif key == 's':
                 twist = Twist()
                 twist.linear.x = -self.lin_speed
                 twist.angular.z = 0.0
                 self.pub_cmd.publish(twist)
-                continue
-            elif key == 'e':  # rotate left
+                print(f"Go backward: {-self.lin_speed:.2f} m/s")
+
+            #rotate to left
+            elif key == 'e':
                 twist = Twist()
                 twist.linear.x = 0.0
                 twist.angular.z = self.ang_speed
                 self.pub_cmd.publish(twist)
-                continue
-            elif key == 'r':  # rotate right
+                print(f"Rotate left: {self.ang_speed:.2f} rad/s")
+
+            #rotatwe to right
+            elif key == 'r':
                 twist = Twist()
                 twist.linear.x = 0.0
                 twist.angular.z = -self.ang_speed
                 self.pub_cmd.publish(twist)
-                continue
-            elif key == 'd':  # stop
+                print(f"Rotate right: {-self.ang_speed:.2f} rad/s")
+
+            #stop
+            elif key == 'd':
                 twist = Twist()
                 self.pub_cmd.publish(twist)
-                continue
+                print("Stop")
+
             else:
-                print("Invalid key. Press 'h' for help.")
-                continue
+                print(f"Unknown key '{key}'. Press 'h' for help.")
 
 
 def main(args=None):

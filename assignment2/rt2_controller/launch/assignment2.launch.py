@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import IncludeLaunchDescription, ExecuteProcess
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
@@ -7,14 +7,17 @@ import os
 
 
 def generate_launch_description():
-
-    #launch gazebo 
+    
+    #path to bme_gazebo_sensors package
     pkg_bme = get_package_share_directory('bme_gazebo_sensors')
-
+    
+    #launch Gazebo with robot spawn
     gazebo_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_bme, 'launch', 'spawn_robot.launch.py')
-        )
+        ),
+
+        launch_arguments={'use_sim_time': 'true'}.items()
     )
 
     #node2: controller
@@ -42,7 +45,15 @@ def generate_launch_description():
     ])
 
 
-#ELSE:
+# !terminal:
+#   colcon build
+#   source install/setup.bash
+#   ros2 launch rt2_controller assignment2.launch.py
+# it is necessary to have xterm installed:
+#   sudo apt install xterm
+
+
+# ELSE - 3 terminals:
 #terminal 1:
 #   colcon build
 #   source install/setup.bash
