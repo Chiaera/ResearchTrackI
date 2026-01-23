@@ -112,7 +112,7 @@ class UserInterface(Node):
                         print("Invalid option, try again.\n")
                     
             except ValueError:
-                print("Invalid value. Continue..\n")
+                print("Invalid value. Continue.\n")
 
 
 def main(args=None):

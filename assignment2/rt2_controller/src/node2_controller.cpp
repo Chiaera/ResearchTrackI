@@ -3,6 +3,7 @@
 #include <cmath>
 #include <limits>
 #include <deque>
+#include <chrono>
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
@@ -21,14 +22,10 @@ public:
     Controller() : Node("node2_controller"), threshold_(0.5)
     {
         //subscriber to the user command
-        sub_cmd_ = create_subscription<geometry_msgs::msg::Twist>(
-            "/cmd_vel_input", 10,
-            std::bind(&Controller::cmdCallback, this, _1));
+        sub_cmd_ = create_subscription<geometry_msgs::msg::Twist>("cmd_vel_input", 10, std::bind(&Controller::cmdCallback, this, _1));
 
         //subscribet to laser
-        sub_scan_ = create_subscription<sensor_msgs::msg::LaserScan>(
-            "/scan", 10,
-            std::bind(&Controller::scanCallback, this, _1));
+        sub_scan_ = create_subscription<sensor_msgs::msg::LaserScan>("/scan", 10, std::bind(&Controller::scanCallback, this, _1));
 
         //publisher of the twist
         pub_cmd_ = create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
@@ -42,6 +39,9 @@ public:
         //get averages
         srv_get_averages_ = create_service<rt2_interfaces::srv::GetAverages>("/get_averages", std::bind(&Controller::getAverages, this, _1, _2));
 
+        //timer for backward motion (100ms period)
+        backup_timer_ = create_wall_timer(std::chrono::milliseconds(100), std::bind(&Controller::backupTimerCallback, this));
+
         RCLCPP_INFO(get_logger(), "Controller awakes");
     }
 
@@ -52,6 +52,13 @@ private:
 
     //threshold
     double threshold_;
+
+    //backup state
+    bool is_backing_up_ = false;
+    rclcpp::Time backup_start_time_;
+    static constexpr double BACKUP_DURATION = 1.0; //1s
+    static constexpr double BACKUP_SPEED = -0.2; //-0.2 m/s
+
 
     //subscriber
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_cmd_;
@@ -65,6 +72,9 @@ private:
     rclcpp::Service<rt2_interfaces::srv::SetThreshold>::SharedPtr srv_set_threshold_;
     rclcpp::Service<rt2_interfaces::srv::GetAverages>::SharedPtr srv_get_averages_;
 
+    //timer for backup
+    rclcpp::TimerBase::SharedPtr backup_timer_;
+
     //callback for user command
     void cmdCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
     {
@@ -76,7 +86,7 @@ private:
         }
     }
 
-    //callback for  laser
+    //callback for laser
     void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
         //lambda to update the minimum distance
@@ -101,6 +111,7 @@ private:
         const double left_min_ang  =  M_PI / 6.0;   // +30°
         const double left_max_ang  =  M_PI / 2.0;   // +90°
 
+        //process each laser point
         for (size_t i = 0; i < msg->ranges.size(); ++i) {
             const double r = msg->ranges[i];
             const double ang = msg->angle_min + static_cast<double>(i) * msg->angle_increment;
@@ -126,16 +137,25 @@ private:
         //determine the direction of the closest obstacle
         std::string direction = "unknown";
         double best = std::numeric_limits<double>::infinity();
-        if (std::isfinite(min_right) && min_right < best) { best = min_right; direction = "right"; }
-        if (std::isfinite(min_front) && min_front < best) { best = min_front; direction = "front"; }
-        if (std::isfinite(min_left)  && min_left  < best) { best = min_left;  direction = "left";  }
+        if (std::isfinite(min_right) && min_right < best) { 
+            best = min_right; 
+            direction = "right"; 
+        }
+        if (std::isfinite(min_front) && min_front < best) { 
+            best = min_front; 
+            direction = "front"; 
+        }
+        if (std::isfinite(min_left)  && min_left  < best) { 
+            best = min_left;  
+            direction = "left";  
+        }
         if (direction == "unknown") {
             RCLCPP_WARN(get_logger(), "No valid obstacle distances detected in any sector.");
         } else {
             RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000, "Closest obstacle: %s (min=%.2f, thr=%.2f)", direction.c_str(), min_global, threshold_);
         }
 
-        //print messages for obstacles
+        //publish obstacle info
         rt2_interfaces::msg::ObstacleInfo info;
         info.min_distance = static_cast<float>(min_global);
         info.direction = direction;
@@ -143,18 +163,51 @@ private:
         pub_info_->publish(info);
 
         //set the safe zone
-        geometry_msgs::msg::Twist safe_cmd = last_cmd_;
         bool too_close = (min_global < threshold_);
-        if (too_close && safe_cmd.linear.x > 0.0) { //blocking forward motion
-            safe_cmd.linear.x = 0.0;
-            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "Too close: blocking forward (min=%.2f < thr=%.2f). Rotation allowed.", min_global, threshold_);
-        } else if (too_close) { 
-            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "TOO CLOSE: forward blocked, rotation/backward allowed (%.2f < %.2f)", min_global, threshold_);
-        } else {
-            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000, "SAFE: command allowed (%.2f >= %.2f)", min_global, threshold_);
+        
+        //to close: start backing up
+        if (too_close && last_cmd_.linear.x > 0.0 && !is_backing_up_) {
+            RCLCPP_WARN(get_logger(), "TOO CLOSE (%.2fm < %.2fm)! Starting 1-second backward motion", min_global, threshold_);
+            is_backing_up_ = true;
+            backup_start_time_ = this->now();
+        } else if (!too_close) {
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 2000, "Safe zone: %.2fm >= %.2fm", min_global, threshold_);
         }
         
-        pub_cmd_->publish(safe_cmd);
+        //if not backing up, publish the last command
+        if (!is_backing_up_) {
+            pub_cmd_->publish(last_cmd_);
+        }
+    }
+
+    //callback for timer of backward motion
+    void backupTimerCallback()
+    {
+        if (!is_backing_up_) {
+            return;
+        }
+
+        auto elapsed = (this->now() - backup_start_time_).seconds();
+
+        if (elapsed < BACKUP_DURATION) {
+            //backward motion continue
+            geometry_msgs::msg::Twist backup_cmd;
+            backup_cmd.linear.x = BACKUP_SPEED;
+            backup_cmd.angular.z = 0.0;
+            pub_cmd_->publish(backup_cmd);
+            
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+                "Continue Backward motion (%.1fs/%.1fs)", elapsed, BACKUP_DURATION);
+        } else {
+            //backup complete - stop robot
+            geometry_msgs::msg::Twist stop_cmd;
+            stop_cmd.linear.x = 0.0;
+            stop_cmd.angular.z = 0.0;
+            pub_cmd_->publish(stop_cmd);
+            
+            is_backing_up_ = false;
+            RCLCPP_INFO(get_logger(), "Backup complete. Robot stopped in safe position.");
+        }
     }
 
     //service: set threshold
