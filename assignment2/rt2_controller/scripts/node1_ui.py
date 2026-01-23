@@ -5,6 +5,35 @@ from geometry_msgs.msg import Twist
 from rt2_interfaces.msg import ObstacleInfo
 from rt2_interfaces.srv import SetThreshold, GetAverages
 
+import sys
+import termios
+import tty
+
+
+HELP = r"""
+f - Forward
+s - Backward
+e - Rotate left
+r - Rotate right
+d - Stop
+t - Set new threshold
+y - Get averages of last 5 velocities
+u - Set linear speed
+i - Set angular speed
+q - Quit
+"""
+
+def read_key():
+    """Read 1 key without Enter."""
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        ch = sys.stdin.read(1)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+    return ch
+
 class UserInterface(Node):
     def __init__(self):
         super().__init__('node1_ui')
@@ -29,7 +58,13 @@ class UserInterface(Node):
             10
         )
         
-        self.get_logger().info("Insert linear velocity (linear_x) and angular velocity (angular_z):")
+        self.lin_speed = 0.5
+        self.ang_speed = 1.0
+
+        print(HELP)
+        print(f"Current speeds: linear= {self.lin_speed:.2f}, angular= {self.ang_speed:.2f}")
+        print("Press a key ('h' to reprint the options).")
+
 
 
     # CALLBACKS
@@ -70,49 +105,80 @@ class UserInterface(Node):
             #process incoming messages
             rclpy.spin_once(self, timeout_sec=0.1)
 
-            try:
-                print("\nSET VELOCITIES:")
-                lin = float(input("linear_x: "))
-                ang = float(input("angular_z: "))
+            key = read_key()
 
+            #setting
+            if key == 'q': # quit
+                print("\nQuitting.")
                 twist = Twist()
-                twist.linear.x = lin
-                twist.angular.z = ang
-
                 self.pub_cmd.publish(twist)
-                print(f"Command sent: linear_x={lin}, angular_z={ang}")
+                break
+            elif key == 'h': # help
+                print(HELP)
+                continue
+            elif key == 't': # set threshold
+                try:
+                    req = SetThreshold.Request()
+                    req.threshold = float(input("\nInsert new threshold value: "))
+                    future = self.client_threshold.call_async(req)
+                    rclpy.spin_until_future_complete(self, future)
+                    self.threshold_callback(future)
+                except ValueError:
+                    print("Invalid threshold.")
+                continue
+            elif key == 'y': # get averages
+                req = GetAverages.Request()
+                future = self.client_averages.call_async(req)
+                rclpy.spin_until_future_complete(self, future)
+                self.averages_callback(future)
+                continue
+            elif key == 'u': # set linear speed
+                try:
+                    self.lin_speed = float(input("\nSet linear speed: "))
+                    print(f"new linear speed= {self.lin_speed:.2f}")
+                except ValueError:
+                    print("Invalid value.")
+                continue
+            elif key == 'i': # set angular speed
+                try:
+                    self.ang_speed = float(input("\nSet angular speed: "))
+                    print(f"new angular speed= {self.ang_speed:.2f}")
+                except ValueError:
+                    print("Invalid value.")
+                continue
 
-                #request to the user
-                while  (True):
-                    print("\nOPTIONS:")
-                    print("1 - Set new threshold")
-                    print("2 - Get averages")
-                    print("3 - Continue")
-                    request = int(input("Choose an number option: "))
-                    
-                    if request == 1:
-                        req = SetThreshold.Request()
-                        req.threshold = float(input("\nInsert new threshold value: "))
-                        future = self.client_threshold.call_async(req)
-                        rclpy.spin_until_future_complete(self, future)
-                        self.threshold_callback(future)
-                        break
-
-                    elif request == 2:
-                        req = GetAverages.Request()
-                        future = self.client_averages.call_async(req)
-                        rclpy.spin_until_future_complete(self, future)
-                        self.averages_callback(future)
-                        break
-                    
-                    elif request == 3:
-                        break
-                    
-                    else:
-                        print("Invalid option, try again.\n")
-                    
-            except ValueError:
-                print("Invalid value. Continue.\n")
+            #motion
+            elif key == 'f': # forward
+                twist = Twist()
+                twist.linear.x = self.lin_speed
+                twist.angular.z = 0.0
+                self.pub_cmd.publish(twist)
+                continue
+            elif key == 's':  # backward
+                twist = Twist()
+                twist.linear.x = -self.lin_speed
+                twist.angular.z = 0.0
+                self.pub_cmd.publish(twist)
+                continue
+            elif key == 'e':  # rotate left
+                twist = Twist()
+                twist.linear.x = 0.0
+                twist.angular.z = self.ang_speed
+                self.pub_cmd.publish(twist)
+                continue
+            elif key == 'r':  # rotate right
+                twist = Twist()
+                twist.linear.x = 0.0
+                twist.angular.z = -self.ang_speed
+                self.pub_cmd.publish(twist)
+                continue
+            elif key == 'd':  # stop
+                twist = Twist()
+                self.pub_cmd.publish(twist)
+                continue
+            else:
+                print("Invalid key. Press 'h' for help.")
+                continue
 
 
 def main(args=None):

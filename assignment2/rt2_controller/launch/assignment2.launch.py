@@ -40,3 +40,16 @@ def generate_launch_description():
         controller_node,
         ui_node
     ])
+
+
+#ELSE:
+#terminal 1:
+#   colcon build
+#   source install/setup.bash
+#   ros2 launch bme_gazebo_sensors spawn_robot.launch.py
+#terminal 2:
+#   source install/setup.bash
+#   ros2 run rt2_controller node2_controller
+#terminal 3:
+#   source install/setup.bash
+#   ros2 run rt2_controller node1_ui.py
