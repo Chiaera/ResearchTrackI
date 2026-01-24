@@ -57,7 +57,7 @@ private:
     bool is_backing_up_ = false;
     rclcpp::Time backup_start_time_;
     static constexpr double BACKUP_DURATION = 1.0; //1s
-    static constexpr double BACKUP_SPEED = -0.2; //-0.2 m/s
+    static constexpr double BACKUP_SPEED = -0.5; //-0.5 m/s
 
 
     //subscriber
@@ -102,14 +102,21 @@ private:
         double min_left   = std::numeric_limits<double>::infinity();
         double min_front  = std::numeric_limits<double>::infinity();
         double min_right  = std::numeric_limits<double>::infinity();
+        double min_back   = std::numeric_limits<double>::infinity();
 
         //zone angles
-        const double right_min_ang = -M_PI / 2.0;   // -90°
-        const double right_max_ang = -M_PI / 6.0;   // -30°
-        const double front_min_ang = -M_PI / 6.0;   // -30°
-        const double front_max_ang =  M_PI / 6.0;   // +30°
-        const double left_min_ang  =  M_PI / 6.0;   // +30°
-        const double left_max_ang  =  M_PI / 2.0;   // +90°
+        const double right_min_ang = -M_PI / 2.0; // -90°
+        const double right_max_ang = -M_PI / 6.0; // -30°
+        const double front_min_ang = -M_PI / 6.0; // -30°
+        const double front_max_ang =  M_PI / 6.0; // +30°
+        const double left_min_ang  =  M_PI / 6.0; // +30°
+        const double left_max_ang  =  M_PI / 2.0; // +90°
+
+        //back zone angles 
+        const double back_min_ang_1 = -M_PI; // -180°
+        const double back_max_ang_1 = -2.0*M_PI/3.0; // -120°
+        const double back_min_ang_2 =  2.0*M_PI/3.0; // +120°
+        const double back_max_ang_2 =  M_PI; // +180°
 
         //process each laser point
         for (size_t i = 0; i < msg->ranges.size(); ++i) {
@@ -126,13 +133,14 @@ private:
                 update_min(min_front, r);
             } else if (ang > left_min_ang && ang <= left_max_ang) { //+30° to +90°
                 update_min(min_left, r);
+            } else if ((ang >= back_min_ang_1 && ang <= back_max_ang_1) || (ang >= back_min_ang_2 && ang <= back_max_ang_2)) {
+                update_min(min_back, r);
             }
         }
 
         //check for non-finite minimums
-        if (!std::isfinite(min_global)) {
-            min_global = 0.0;
-        }
+        if (!std::isfinite(min_global)) min_global = 0.0; //block robot if no obstacle detected
+        if (!std::isfinite(min_back)) min_back = std::numeric_limits<double>::infinity(); //empty space if no obstacle detected
 
         //determine the direction of the closest obstacle
         std::string direction = "unknown";
@@ -149,8 +157,11 @@ private:
             best = min_left;  
             direction = "left";  
         }
+        if (std::isfinite(min_back) && min_back < best) { 
+            best = min_back; direction = "back"; 
+        }
         if (direction == "unknown") {
-            RCLCPP_WARN(get_logger(), "No valid obstacle distances detected in any sector.");
+            RCLCPP_WARN(get_logger(), "No valid obstacle distances detected.");
         } else {
             RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000, "Closest obstacle: %s (min=%.2f, thr=%.2f)", direction.c_str(), min_global, threshold_);
         }
@@ -163,20 +174,37 @@ private:
         pub_info_->publish(info);
 
         //set the safe zone
-        bool too_close = (min_global < threshold_);
+        double min_forward_zone = std::min({min_front, min_left, min_right});
+
+        bool front_too_close = (min_forward_zone < threshold_);
+        bool back_too_close = (min_back < threshold_);
         
-        //to close: start backing up
-        if (too_close && last_cmd_.linear.x > 0.0 && !is_backing_up_) {
-            RCLCPP_WARN(get_logger(), "TOO CLOSE (%.2fm < %.2fm)! Starting 1-second backward motion", min_global, threshold_);
+        //automatic backward if going forward into obstacle
+        if (front_too_close && last_cmd_.linear.x > 0.0 && !is_backing_up_) {
+            RCLCPP_WARN(get_logger(), "Obstacke in the front zone(%.2fm < %.2fm). Starting automatic backward motion", min_forward_zone, threshold_);
             is_backing_up_ = true;
             backup_start_time_ = this->now();
-        } else if (!too_close) {
-            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 2000, "Safe zone: %.2fm >= %.2fm", min_global, threshold_);
         }
-        
-        //if not backing up, publish the last command
+
+        //no automatic backward - check commands
         if (!is_backing_up_) {
-            pub_cmd_->publish(last_cmd_);
+            geometry_msgs::msg::Twist safe_cmd = last_cmd_;
+            
+            //block forward if obstacle in forward zone 
+            if (front_too_close && safe_cmd.linear.x > 0.0) { 
+                safe_cmd.linear.x = 0.0;
+                RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "Blocked forward: obstacle in forward zone at %.2fm (threshold %.2fm)", min_forward_zone, threshold_);
+            }
+            
+            //block backward if obstacle behind
+            if (back_too_close && safe_cmd.linear.x < 0.0) {
+                safe_cmd.linear.x = 0.0;
+                RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "Blocked backward motion: obstacle at %.2fm (threshold %.2fm)", min_back, threshold_);
+            } else if (safe_cmd.linear.x < 0.0) { //only backup motion
+                RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000, "Backward allowed: back_dist=%.2fm >= thr=%.2fm", min_back, threshold_);
+            }
+            
+            pub_cmd_->publish(safe_cmd);
         }
     }
 
@@ -196,8 +224,7 @@ private:
             backup_cmd.angular.z = 0.0;
             pub_cmd_->publish(backup_cmd);
             
-            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                "Continue Backward motion (%.1fs/%.1fs)", elapsed, BACKUP_DURATION);
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, "Backward motion (%.1fs/%.1fs)", elapsed, BACKUP_DURATION);
         } else {
             //backup complete - stop robot
             geometry_msgs::msg::Twist stop_cmd;
@@ -217,7 +244,7 @@ private:
     {
         threshold_ = req->threshold;
         res->success = true;
-        res->message = "Threshold updated successfully";
+        res->message = "Threshold updated successfully to " + std::to_string(threshold_);
         RCLCPP_INFO(get_logger(), "New threshold: %.2f", threshold_);
     }
 
@@ -230,22 +257,26 @@ private:
             res->avg_linear = 0.0;
             res->avg_angular = 0.0;
             res->message = "No velocity input received yet";
+            RCLCPP_WARN(get_logger(), "GetAverages called but no inputs received");
             return;
         }
 
         double sum_linear = 0.0;
         double sum_angular = 0.0;
 
-        for (const auto &cmd : last_inputs_) {
+        RCLCPP_INFO(get_logger(), "Computing averages from %zu inputs:", last_inputs_.size());
+        for (size_t i = 0; i < last_inputs_.size(); ++i) {
+            const auto &cmd = last_inputs_[i];
             sum_linear += cmd.linear.x;
             sum_angular += cmd.angular.z;
+            RCLCPP_INFO(get_logger(), "  [%zu] linear=%.2f, angular=%.2f", i, cmd.linear.x, cmd.angular.z);
         }
 
         res->avg_linear = sum_linear / last_inputs_.size();
         res->avg_angular = sum_angular / last_inputs_.size();
         res->message = "Averages computed successfully over " + std::to_string(last_inputs_.size()) + " input(s)";
 
-        RCLCPP_INFO(get_logger(), "Robot average velocities over last %zu input(s): lin=%.2f, ang=%.2f",
+        RCLCPP_INFO(get_logger(), "Robot average velocities over last %zu input(s): lin=%.2f m/s, ang=%.2f rad/s",
             last_inputs_.size(), res->avg_linear, res->avg_angular);
     }
 };

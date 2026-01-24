@@ -8,7 +8,6 @@ from rt2_interfaces.srv import SetThreshold, GetAverages
 import sys
 import termios
 import tty
-import select
 
 
 HELP = r"""
@@ -33,10 +32,7 @@ def read_key():
     old = termios.tcgetattr(fd)
     try:
         tty.setraw(fd)
-        if select.select([sys.stdin], [], [], 0)[0]:
-            ch = sys.stdin.read(1)
-        else:
-            ch = ''
+        ch = sys.stdin.read(1)
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
     return ch
@@ -58,19 +54,17 @@ class UserInterface(Node):
         self.pub_cmd = self.create_publisher(Twist, '/cmd_vel_input', 10)
 
         # subscriber
-        self.sub_obstacle_info = self.create_subscription(
-            ObstacleInfo,
-            '/obstacle_info',
-            self.obstacle_info_callback,
-            10
-        )
+        self.sub_obstacle_info = self.create_subscription(ObstacleInfo, '/obstacle_info', self.obstacle_info_callback, 10)
         
-        self.lin_speed = 3.0
+        self.lin_speed = 0.5
         self.ang_speed = 1.0
 
         print(HELP)
-        print(f"Current speeds: linear= {self.lin_speed:.2f} m/s, angular= {self.ang_speed:.2f} rad/s\n")
+        print(f"Current speeds: linear= {self.lin_speed:.2f} m/s, angular= {self.ang_speed:.2f} rad/s")
         print("Press a key ('h' to reprint the options).")
+
+        #to run loop
+        self.should_quit = False 
 
 
 
@@ -84,7 +78,7 @@ class UserInterface(Node):
                 f"threshold={msg.threshold:.2f}"
             )
         except Exception as e:
-            self.get_logger().error(f"Error in obstacle_info_callback: {e}")
+            self.get_logger().error(f"Error in obstacle info callback: {e}")
 
     #callback for threshold setting
     def threshold_callback(self, future):
@@ -92,7 +86,7 @@ class UserInterface(Node):
             response = future.result()
             self.get_logger().info(response.message)
         except Exception as e:
-            self.get_logger().error(f"Error in threshold_callback: {e}")
+            self.get_logger().error(f"Error in threshold setting: {e}")
     
     #callback for averages
     def averages_callback(self, future):
@@ -104,11 +98,11 @@ class UserInterface(Node):
                 f"angular= {response.avg_angular:.2f}, "
             )
         except Exception as e:
-            self.get_logger().error(f"Error in averages_callback: {e}")
+            self.get_logger().error(f"Error: {e}")
 
 
     def run(self):
-        while rclpy.ok():
+        while rclpy.ok() and not self.should_quit:
             #process incoming messages
             rclpy.spin_once(self, timeout_sec=0.1)
 
@@ -122,6 +116,8 @@ class UserInterface(Node):
                 print("Quit\n")
                 twist = Twist()
                 self.pub_cmd.publish(twist)
+                self.should_quit = True 
+                rclpy.shutdown()               
                 break
 
             #help
@@ -189,6 +185,7 @@ class UserInterface(Node):
             #forward
             elif key == 'f':
                 twist = Twist()
+                twist.linear.x = -self.lin_speed
                 twist.linear.x = self.lin_speed
                 twist.angular.z = 0.0
                 self.pub_cmd.publish(twist)
@@ -215,12 +212,15 @@ class UserInterface(Node):
                 twist = Twist()
                 twist.linear.x = 0.0
                 twist.angular.z = -self.ang_speed
+                print(f"[DEBUG] Publishing: linear.x={twist.linear.x}, angular.z={twist.angular.z}") 
                 self.pub_cmd.publish(twist)
                 print(f"Rotate right: {-self.ang_speed:.2f} rad/s")
 
             #stop
             elif key == 'd':
                 twist = Twist()
+                twist.linear.x = 0.0
+                twist.angular.z = 0.0
                 self.pub_cmd.publish(twist)
                 print("Stop")
 
