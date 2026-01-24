@@ -6,7 +6,7 @@ The system allows the user to drive the robot around. When the robot gets "too c
 The user can:
 - set linear and angular velocities
 - change the obstacle detection threshold
-- get the average velocities of the last 5 inputs
+- get the average velocities of the last 5 commands
 
 <br>
 
@@ -31,14 +31,14 @@ The user can:
      h - help
      q - Quit
      ```
-   - convert input to command
-   - publish velocity command to `/cmd_vel_input`
+   - convert input into commands
+   - publish velocity commands to `/cmd_vel_input`
    - call services `SetThreshold()` and `GetAverages()`
 
 2. ### `node2_controller` - C++
    This node handles **robot control** and **obstacle avoidance**:
 
-   **Robot control**
+   #### Robot control
    - subscribe to
         - `/cmd_vel_input` (user commands)
         - `/scan` (laser scanner data)
@@ -46,31 +46,39 @@ The user can:
         - `/cmd_vel` (safe velocity commands)
         - `/obstacle_info` (obstacle information)
    - provide service to
-        - `/set_threshold` (change obstacle detection threshold)
-        - `/get_averages` (Get average velocities of last 5 inputs).
+        - `/set_threshold` (update obstacle detection threshold)
+        - `/get_averages` (compute average velocities of last 5 inputs).
+
+   <br>
           
-     **Obstacle avoidance**
-     The laser scanner divides the space into zones:
+   #### Obstacle avoidance
+   The laser scanner divides into angular zones:
      - **Front zone** (-30° to +30°)
      - **Left zone** (+30° to +90°)
      - **Right zone** (-90° to -30°)
      - **Back zone** (-180° to -120° and +120° to +180°)
-     The robot behaves differently depending on the area:
-     1. **Forward motion, if obstacle is in front/lateral zone**: backward motion of 1 second, the robot will return in the previously position
-     2. **Forward command, if obstacle is in forward hemisphere**: the forward motion is blocked, the rebot can only rotate
-     3. **Backward command, if obstacle is behind**: the backward motion is blocked
+       
+   The controller applies the following safety rules:
+   1. **Forward motion with obstacle in the forward hemisphere**: automatic *backward motion* for 1 second to return to a safe position
+   2. **Forward command while an obstacle remains in the forward zone**: forward motion is blocked, the robot can *only rotate*
+   3. **Backward command with obstacle behind the robot**: backward motion is blocked
+
+<br>
+    
+Only safe velocity commands are published to `/cmd_vel`.
 
 ## Services
   1. ### `GetAverages`
-     Computes the *averages of the last 5 velocities (linear and angular)*, if the command are less than 5, the service will return the average anyway but it will specify how many values are considered.
-  2. ### `SetThreshold`
-     Changes the obstacle detection threshold value (in meters).
+     Computes the *averages of the last 5 velocities (linear and angular)*.
+     If fewer than 5 commands are available, the average is computed over the existing inputs and the number of samples used is reported.
+  3. ### `SetThreshold`
+     Updates the obstacle detection threshold value (in meters.
 
 ## Custom Message
 ### `ObstacleInfo`
-Publish the information about the obstacle into `/obstacle_info` topic:
-- minimun distance to any obstacle
-- direction od the closest obstacle
+Publish the information about the obstacle on `/obstacle_info` topic:
+- minimum distance to the closest obstacle
+- direction of the closest obstacle (**front**, **left**, **right**, **back**)
 - current threshold value
 
 ---
@@ -80,10 +88,11 @@ Operating System: Ubuntu (suggested: 24.04)
 ROS 2: suggested distribution Jazzy
 Standard ROS 3 tools:
 - `colcon`
-- Gazebo and Rviz
+- Gazebo
+- Rviz
 - `xterm` terminal
 
-To install **gazebo anz Rviz** and the simulation enviornment:
+To install **gazebo anz Rviz**:
 ```
 # install Gazebo Harmonic (per Jazzy)
 sudo apt update
@@ -91,7 +100,10 @@ sudo apt install ros-jazzy-ros-gz
 
 # install RViz2
 sudo apt install ros-jazzy-rviz2
+```
 
+To clone the **simulation package**:
+```
 # clone the professor repository of the Research Track course
 cd ~/ros2_ws/src
 git clone https://github.com/CarmineD8/bme_gazebo_sensors.git
@@ -104,7 +116,7 @@ sudo apt install xterm
 ---
 
 ## Workspace Setup
-In the desired directory, create the workspace:
+Create the workspace:
 ```
 mkdir -p ~/ros2_ws/src
 cd ~/ros2_ws/src
@@ -113,41 +125,25 @@ clone the `ResearchTrackI` repository
 ```
 gh repo clone Chiaera/ResearchTrackI
 ```
+
+    minimum distance to the closest obstacle
+
+    direction of the closest obstacle (front, left, right, back)
+
+    current threshold value
+
 The final structure should look like this:
 ```
 .
 └── ros2_ws
       └── src
           ├── bme_gazebo_sensors   # simulation package
-          │   ├── CMakeLists.txt
-          │   ├── config
-          │   │   └── ekf.yaml
-          │   ├── launch
-          │   │   ├── spawn_robot.launch.py
-          │   │   └── world.launch.py
-          │   ├── meshes
-          │   │   ├── lidar.dae
-          │   │   ├── mogi_bot.dae
-          │   │   └── wheel.dae
-          │   ├── package.xml
-          │   ├── rviz
-          │   │   ├── gps.rviz
-          │   │   ├── rviz.rviz
-          │   │   └── urdf.rviz
-          │   ├── urdf
-          │   │   ├── materials.xacro
-          │   │   ├── mogi_bot.gazebo
-          │   │   └── mogi_bot.urdf
-          │   └── worlds
-          │       ├── home.sdf
-          │       ├── my.sdf
-          │       ├── my_world.sdf
-          │       └── world.sdf
           |
           └── ResearchTrackI
-              └── assignment1
+              └── assignment1   # assignment 1 directory
               │       └── (*)
-              └──  assignment2   # assignment directory
+              |
+              └──  assignment2   # assignment 2 directory
                       ├── rt2_controller
                       │   ├── CMakeLists.txt
                       │   ├── include
@@ -190,12 +186,12 @@ source install/setup.bash
 # Launch the whole assignment
 ros2 launch bme_gazebo_sensors spawn_robot.launch.py
 ```
-This will open 3 xterm windows:
+This opens 3 `xterm` windows:
 - Gazebo + RViz (simulation)
 - Controller node (logs)
 - UI node (keyboard control)
 
-You can also launch every node manually (3 separate terminals):
+You can also launch the nodes manually (3 separate terminals):
 Terminal 1:
 ```
 colcon build
@@ -214,4 +210,4 @@ Terminal 3:
 source install/setup.bash
 ros2 run rt2_controller node1_ui.py
 ```
-Once launched, follow the UI prompts in the terminal to control the robot.
+Follow the UI instructions to control the robot.
