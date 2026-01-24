@@ -52,9 +52,30 @@ The user can set the linear velcity (it can change the default one), the angular
 Operating System: Ubuntu (suggested: 24.04)
 ROS 2: suggested distribution Jazzy
 Standard ROS 3 tools:
-      colcon
-      gazebo package
-      xterm terminal
+- colcon
+- Gazebo and Rviz package
+- xterm terminal
+
+For **gazebo anz Rviz package**:
+```
+# From the ~/ros2_ws/src path
+# install Gazebo Harmonic (per Jazzy)
+sudo apt update
+sudo apt install ros-jazzy-ros-gz
+
+# install RViz2
+sudo apt install ros-jazzy-rviz2
+
+# clone the professor repository of the Research Track course
+cd ~/ros2_ws/src
+git clone https://github.com/CarmineD8/bme_gazebo_sensors.git
+```
+
+To install the **xterm** terminal:
+```
+sudo apt install xterm
+```
+---
 
 ## Workspace Setup
 As the **Assignemnt 1**, from your preferred directory, create the workspace
