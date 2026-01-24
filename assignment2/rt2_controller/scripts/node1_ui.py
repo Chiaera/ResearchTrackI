@@ -1,3 +1,9 @@
+# NODE 1 -User Interface Node for Robot Control:
+#   read the keyboard input without Enter
+#   get the commands from the read input
+#   publish the commands to the controller node
+#   call services to set threshold and get averages
+
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node

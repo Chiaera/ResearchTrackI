@@ -1,3 +1,8 @@
+// NODE 2 - Controller Node for Robot Safety and Obstacle Avoidance
+//   subscribe to user commands, laser scan
+//   publish safe commands to robot, obstacle avoidance
+//   provide service to set obstacle threshold and get average velocities
+
 #include <memory>
 #include <algorithm>
 #include <cmath>
