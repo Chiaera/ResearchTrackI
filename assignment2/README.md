@@ -47,6 +47,7 @@ The user can set the linear velcity (it can change the default one), the angular
 
 
 ---
+
 ## Requirements
 Operating System: Ubuntu (suggested: 24.04)
 ROS 2: suggested distribution Jazzy
@@ -98,6 +99,8 @@ The final structure should look like this:
                         └── SetThreshold.srv
 ```
 *( * ) for the **assignment1** structure see the  `assignment1` directory*.
+
+---
 
 ## Execute the file
 To run the assignment from the *LaunchFile*:
