@@ -186,7 +186,7 @@ private:
         
         //automatic backward if going forward into obstacle
         if (front_too_close && last_cmd_.linear.x > 0.0 && !is_backing_up_) {
-            RCLCPP_WARN(get_logger(), "Obstacke in the front zone(%.2fm < %.2fm). Starting automatic backward motion", min_forward_zone, threshold_);
+            RCLCPP_WARN(get_logger(), "Obstacle in the front zone(%.2fm < %.2fm). Starting automatic backward motion", min_forward_zone, threshold_);
             is_backing_up_ = true;
             backup_start_time_ = this->now();
         }

@@ -92,7 +92,7 @@ Standard ROS 3 tools:
 - Rviz
 - `xterm` terminal
 
-To install **Gazebo anz Rviz**:
+To install **Gazebo and Rviz**:
 ```
 # install Gazebo Harmonic (per Jazzy)
 sudo apt update
@@ -172,7 +172,7 @@ Using the launch file:
 cd ~/ros2_ws
 colcon build
 source install/setup.bash
-ros2 launch bme_gazebo_sensors spawn_robot.launch.py
+ros2 launch rt2_controller assignment2.launch.py
 ```
 This opens 3 `xterm` windows:
 - Gazebo + RViz (simulation)
