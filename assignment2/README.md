@@ -59,9 +59,9 @@ The user can:
      - **Back zone** (-180° to -120° and +120° to +180°)
        
    The controller applies the following safety rules:
-   1. **Forward motion with obstacle in the forward hemisphere**: automatic *backward motion* for 1 second to return to a safe position
-   2. **Forward command while an obstacle remains in the forward zone**: forward motion is blocked, the robot can *only rotate*
-   3. **Backward command with obstacle behind the robot**: backward motion is blocked
+   - **Forward motion with obstacle in the forward hemisphere**: automatic *backward motion* for 1 second to return to a safe position
+   - **Forward command while an obstacle remains in the forward zone**: forward motion is blocked, the robot can *only rotate*
+   - **Backward command with obstacle behind the robot**: backward motion is blocked
 
 <br>
     
@@ -72,7 +72,7 @@ Only safe velocity commands are published to `/cmd_vel`.
      Computes the *averages of the last 5 velocities (linear and angular)*.
      If fewer than 5 commands are available, the average is computed over the existing inputs and the number of samples used is reported.
   3. ### `SetThreshold`
-     Updates the obstacle detection threshold value (in meters.
+     Updates the obstacle detection threshold value (in meters).
 
 ## Custom Message
 ### `ObstacleInfo`
@@ -92,7 +92,7 @@ Standard ROS 3 tools:
 - Rviz
 - `xterm` terminal
 
-To install **gazebo anz Rviz**:
+To install **Gazebo anz Rviz**:
 ```
 # install Gazebo Harmonic (per Jazzy)
 sudo apt update
@@ -121,16 +121,11 @@ Create the workspace:
 mkdir -p ~/ros2_ws/src
 cd ~/ros2_ws/src
 ```
-clone the `ResearchTrackI` repository
+
+clone the `ResearchTrackI` repository:
 ```
 gh repo clone Chiaera/ResearchTrackI
 ```
-
-    minimum distance to the closest obstacle
-
-    direction of the closest obstacle (front, left, right, back)
-
-    current threshold value
 
 The final structure should look like this:
 ```
@@ -174,16 +169,9 @@ The final structure should look like this:
 ## Execute the file
 Using the launch file:
 ```
-# from the workspace root
 cd ~/ros2_ws
-
-# build the enviornment
 colcon build
-
-# active the enviornment
 source install/setup.bash
-
-# Launch the whole assignment
 ros2 launch bme_gazebo_sensors spawn_robot.launch.py
 ```
 This opens 3 `xterm` windows:
