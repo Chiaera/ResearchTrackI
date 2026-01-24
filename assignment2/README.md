@@ -58,7 +58,6 @@ Standard ROS 3 tools:
 
 For **gazebo anz Rviz package**:
 ```
-# From the ~/ros2_ws/src path
 # install Gazebo Harmonic (per Jazzy)
 sudo apt update
 sudo apt install ros-jazzy-ros-gz
@@ -91,33 +90,59 @@ The final structure should look like this:
 ```
 .
 └── ros2_ws
-└── src
-    └── ResearchTrackI
-        └── assignment1
-        │       └── (*)
-        └──  assignment2
-                ├── rt2_controller
-                │   ├── CMakeLists.txt
-                │   ├── include
-                │   │   └── rt2_controller
-                │   ├── launch
-                │   │   └── assignment2.launch.py
-                │   ├── package.xml
-                │   ├── scripts
-                │   │   └── node1_ui.py
-                │   └── src
-                │       └── node2_controller.cpp
-                └── rt2_interfaces
-                    ├── CMakeLists.txt
-                    ├── include
-                    │   └── rt2_interfaces
-                    ├── msg
-                    │   └── ObstacleInfo.msg
-                    ├── package.xml
-                    ├── src
-                    └── srv
-                        ├── GetAverages.srv
-                        └── SetThreshold.srv
+      └── src
+          ├── bme_gazebo_sensors
+          │   ├── CMakeLists.txt
+          │   ├── config
+          │   │   └── ekf.yaml
+          │   ├── launch
+          │   │   ├── spawn_robot.launch.py
+          │   │   └── world.launch.py
+          │   ├── meshes
+          │   │   ├── lidar.dae
+          │   │   ├── mogi_bot.dae
+          │   │   └── wheel.dae
+          │   ├── package.xml
+          │   ├── rviz
+          │   │   ├── gps.rviz
+          │   │   ├── rviz.rviz
+          │   │   └── urdf.rviz
+          │   ├── urdf
+          │   │   ├── materials.xacro
+          │   │   ├── mogi_bot.gazebo
+          │   │   └── mogi_bot.urdf
+          │   └── worlds
+          │       ├── home.sdf
+          │       ├── my.sdf
+          │       ├── my_world.sdf
+          │       └── world.sdf
+          |
+          └── ResearchTrackI
+              └── assignment1
+              │       └── (*)
+              └──  assignment2
+                      ├── rt2_controller
+                      │   ├── CMakeLists.txt
+                      │   ├── include
+                      │   │   └── rt2_controller
+                      │   ├── launch
+                      │   │   └── assignment2.launch.py
+                      │   ├── package.xml
+                      │   ├── scripts
+                      │   │   └── node1_ui.py
+                      │   └── src
+                      │       └── node2_controller.cpp
+                      └── rt2_interfaces
+                          ├── CMakeLists.txt
+                          ├── include
+                          │   └── rt2_interfaces
+                          ├── msg
+                          │   └── ObstacleInfo.msg
+                          ├── package.xml
+                          ├── src
+                          └── srv
+                              ├── GetAverages.srv
+                              └── SetThreshold.srv
 ```
 *( * ) for the **assignment1** structure see the  `assignment1` directory*.
 
