@@ -1,22 +1,28 @@
 # ASSIGNMENT 2
-This project is a ROS 2 package composed of **two nodes** and **two services**  that control a robot to move in a space with obstacles without collide with them.
+This project is a ROS 2 package composed of **two nodes** and **two services**  that control a robot to move in a space with obstacles without colliding with them.
 
-It allows the user to drive the robot around, when the robot is "too close" to an obstacle (traced by the laser), the robot return in the position of 1 second before (*backward motion*).
-The user can set the linear velcity (it can change the default one), the angular velocity and the threshold value, it can also get the average linear and angular velocity of the most recent 5 inputs.
+The system allows the user to drive the robot around. When the robot gets "too close" to an obstacle (detected by the laser scanner), it performs an **automatic 1-second backward motion** to return to a safe position.
+
+The user can:
+- set linear and angular velocities
+- change the obstacle detection threshold
+- get the average velocities of the last 5 inputs
 
 <br>
 
 ## Nodes
 1. ### `node1_ui` - Python
-   This node provides the **menu interfaced** used to control the robot
-   - read the input from the keyboard
+   This node provides a **keyboard-based menu interface** to control the robot:
+   - read keyboard input (single key press, no Enter required)
      ```
+     motion
      f - Forward
      s - Backward
      e - Rotate left
      r - Rotate right
      d - Stop
-     
+
+     settings
      t - Set new threshold
      y - Get averages of last 5 velocities
      u - Set linear speed
@@ -25,26 +31,47 @@ The user can set the linear velcity (it can change the default one), the angular
      h - help
      q - Quit
      ```
-   - turn the input into command
-   - publish command to `controller_node`
-   - call services to `SetThreshold()` and `GetAverages()`
+   - convert input to command
+   - publish velocity command to `/cmd_vel_input`
+   - call services `SetThreshold()` and `GetAverages()`
 
 2. ### `node2_controller` - C++
-   This node is resposable fot the **robot control** and **obstacles avoidance**
-   - subscribe to user commands, laser scan,
-   - publish safe commands to robot, obstacle avoidance,
-   - provide service to set obstacle threshold and get average velocities.
-     The laser scan the **front**, **lateral** and **back** zone, the robot is the area under the threshould value, its behaviour will depend on the zone:
-     - if an obstacle is on **front** or **lateral** the robot will start a backward motion for 1 seconds, returning to a previously position;
-     - if an obstacle is on **back** the robot will stop.
+   This node handles **robot control** and **obstacle avoidance**:
+
+   **Robot control**
+   - subscribe to
+        - `/cmd_vel_input` (user commands)
+        - `/scan` (laser scanner data)
+   - publish to
+        - `/cmd_vel` (safe velocity commands)
+        - `/obstacle_info` (obstacle information)
+   - provide service to
+        - `/set_threshold` (change obstacle detection threshold)
+        - `/get_averages` (Get average velocities of last 5 inputs).
+          
+     **Obstacle avoidance**
+     The laser scanner divides the space into zones:
+     - **Front zone** (-30° to +30°)
+     - **Left zone** (+30° to +90°)
+     - **Right zone** (-90° to -30°)
+     - **Back zone** (-180° to -120° and +120° to +180°)
+     The robot behaves differently depending on the area:
+     1. **Forward motion, if obstacle is in front/lateral zone**: backward motion of 1 second, the robot will return in the previously position
+     2. **Forward command, if obstacle is in forward hemisphere**: the forward motion is blocked, the rebot can only rotate
+     3. **Backward command, if obstacle is behind**: the backward motion is blocked
 
 ## Services
   1. ### `GetAverages`
-     It rapresents the response to computing the *averages of the last 5 velocities (linear and angular)*, if the command are less than 5, the service will return the average anyway but it will specify how many values are considered.
+     Computes the *averages of the last 5 velocities (linear and angular)*, if the command are less than 5, the service will return the average anyway but it will specify how many values are considered.
   2. ### `SetThreshold`
-     It represents the response to *change the threshold value*.
-     
+     Changes the obstacle detection threshold value (in meters).
 
+## Custom Message
+### `ObstacleInfo`
+Publish the information about the obstacle into `/obstacle_info` topic:
+- minimun distance to any obstacle
+- direction od the closest obstacle
+- current threshold value
 
 ---
 
@@ -52,11 +79,11 @@ The user can set the linear velcity (it can change the default one), the angular
 Operating System: Ubuntu (suggested: 24.04)
 ROS 2: suggested distribution Jazzy
 Standard ROS 3 tools:
-- colcon
-- Gazebo and Rviz package
-- xterm terminal
+- `colcon`
+- Gazebo and Rviz
+- `xterm` terminal
 
-For **gazebo anz Rviz package**:
+To install **gazebo anz Rviz** and the simulation enviornment:
 ```
 # install Gazebo Harmonic (per Jazzy)
 sudo apt update
@@ -77,12 +104,12 @@ sudo apt install xterm
 ---
 
 ## Workspace Setup
-As the **Assignemnt 1**, from your preferred directory, create the workspace
+In the desired directory, create the workspace:
 ```
 mkdir -p ~/ros2_ws/src
 cd ~/ros2_ws/src
 ```
-and clone the `ResearchTrackI` repository
+clone the `ResearchTrackI` repository
 ```
 gh repo clone Chiaera/ResearchTrackI
 ```
@@ -91,7 +118,7 @@ The final structure should look like this:
 .
 └── ros2_ws
       └── src
-          ├── bme_gazebo_sensors
+          ├── bme_gazebo_sensors   # simulation package
           │   ├── CMakeLists.txt
           │   ├── config
           │   │   └── ekf.yaml
@@ -120,7 +147,7 @@ The final structure should look like this:
           └── ResearchTrackI
               └── assignment1
               │       └── (*)
-              └──  assignment2
+              └──  assignment2   # assignment directory
                       ├── rt2_controller
                       │   ├── CMakeLists.txt
                       │   ├── include
@@ -149,7 +176,7 @@ The final structure should look like this:
 ---
 
 ## Execute the file
-To run the assignment from the *LaunchFile*:
+Using the launch file:
 ```
 # from the workspace root
 cd ~/ros2_ws
@@ -163,19 +190,27 @@ source install/setup.bash
 # Launch the whole assignment
 ros2 launch bme_gazebo_sensors spawn_robot.launch.py
 ```
+This will open 3 xterm windows:
+- Gazebo + RViz (simulation)
+- Controller node (logs)
+- UI node (keyboard control)
 
-For launch every node singular:
+You can also launch every node manually (3 separate terminals):
+Terminal 1:
 ```
-# in the FIRST terminal:
 colcon build
 source install/setup.bash
 ros2 launch bme_gazebo_sensors spawn_robot.launch.py
+```
 
-# in the SECOND terminal:
+Terminal 2:
+```
 source install/setup.bash
 ros2 run rt2_controller node2_controller
+```
 
-# in the THIRD terminal: 
+Terminal 3:
+```
 source install/setup.bash
 ros2 run rt2_controller node1_ui.py
 ```
