@@ -25,9 +25,9 @@ The user can set the linear velcity (it can change the default one), the angular
      h - help
      q - Quit
      ```
-     - turn the input into command
-     - publish command to `controller_node`
-     - call services to `SetThreshold()` and `GetAverages()`
+   - turn the input into command
+   - publish command to `controller_node`
+   - call services to `SetThreshold()` and `GetAverages()`
 
 2. ### `node2_controller` - C++
    This node is resposable fot the **robot control** and **obstacles avoidance**
