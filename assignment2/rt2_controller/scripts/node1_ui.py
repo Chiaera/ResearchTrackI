@@ -62,7 +62,7 @@ class UserInterface(Node):
 
         # subscriber
         self.sub_obstacle_info = self.create_subscription(ObstacleInfo, '/obstacle_info', self.obstacle_info_callback, 10)
-        
+
         self.lin_speed = 0.5
         self.ang_speed = 1.0
 

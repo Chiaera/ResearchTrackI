@@ -1,5 +1,6 @@
+#setup + warning flag
 cmake_minimum_required(VERSION 3.8)
-project(node2_distance)
+project(rt1_interfaces)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -7,11 +8,14 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(turtlesim REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(rt1_interfaces REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+
+# generate interfaces
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/Velocity.msg"
+)
+
+ament_export_dependencies(rosidl_default_runtime)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -24,19 +28,5 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
-
-add_executable(node_distance src/node_distance.cpp)
-ament_target_dependencies(node_distance rclcpp std_msgs turtlesim geometry_msgs rt1_interfaces)
-
-install(TARGETS
-  node_distance
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-#launch file
-install(
-  DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME}/
-)
 
 ament_package()

@@ -8,6 +8,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 import time
 from std_msgs.msg import Int32
+from rt1_interfaces.msg import Velocity
 
 
 class UINode(Node):
@@ -19,6 +20,8 @@ class UINode(Node):
         self.pub_t1 = self.create_publisher(Twist, "/turtle1/cmd_vel", 10)
         self.pub_t2 = self.create_publisher(Twist, "/turtle2/cmd_vel", 10)
         self.pub_active = self.create_publisher(Int32, "/active_turtle", 10)
+        # NEW - velocity subscriber
+        self.sub_velocity = self.create_subscription(Velocity, '/velocity', self.velocity_callback, 10)
 
         #define duration of command
         self.timer = self.create_timer(0.5, self.command_loop)
@@ -101,6 +104,14 @@ def get_twist():
         except ValueError:
             print("Invalid velocity input: Insert again both the velocity")
 
+# NEW - velocity callback
+    def velocity_callback(self, msg):
+        try:
+            self.get_logger().info(
+                f"Velocity: linear={msg.linear_x:.2f}, angular={msg.angular_z:.2f}"
+            )
+        except Exception as e:
+            self.get_logger().error(f"Error in velocity callback: {e}")
 
 def main(args=None):
     rclpy.init(args=args)
