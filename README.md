@@ -1,4 +1,4 @@
-# RT - Assignments Overview
+# ROS2 Collision Avoidance (Turtlesim and Gazebo)
 
 This repository contains the two assignments of the course *Research Track I*:
 
